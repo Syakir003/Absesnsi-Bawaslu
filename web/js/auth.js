@@ -67,7 +67,7 @@ export function clearSession() {
   store(null);
 }
 
-export function waitForGsi(timeoutMs = 10_000) {
+export function waitForGsi(timeoutMs = 20_000) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     (function poll() {

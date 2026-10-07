@@ -93,3 +93,12 @@ test('loadInto: error lama juga diabaikan', async () => {
 test('formatTanggal tetap bekerja', () => {
   assert.equal(formatTanggal('2026-10-07'), 'Rab, 07 Okt 2026');
 });
+
+test('addDays: aritmetika tanggal UTC lintas bulan/tahun/kabisat', async () => {
+  const { addDays } = await import('../web/js/ui.js');
+  assert.equal(addDays('2026-10-07', -1), '2026-10-06');
+  assert.equal(addDays('2026-10-01', -1), '2026-09-30');
+  assert.equal(addDays('2026-01-01', -1), '2025-12-31');
+  assert.equal(addDays('2028-03-01', -1), '2028-02-29');
+  assert.equal(addDays('2026-10-07', 0), '2026-10-07');
+});

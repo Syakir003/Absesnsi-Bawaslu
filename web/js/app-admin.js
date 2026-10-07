@@ -15,21 +15,35 @@ function toolbar(...children) {
   return h('div', { class: 'card row no-print' }, ...children);
 }
 
-function exportButton(getRows, columns, filename) {
-  return h('button', { class: 'btn', type: 'button', onclick: () => {
-    const rows = getRows();
+/**
+ * Tombol Export CSV yang konsisten dengan data yang sedang tampil: baris + kunci (tanggal/bulan/...)
+ * yang menghasilkannya disimpan bersama, nama file dibuat dari kunci itu, dan tombol nonaktif
+ * selama memuat, saat gagal memuat, atau saat tidak ada data. Panggil reset() di awal tiap load()
+ * dan set(rows, key) hanya setelah load berhasil.
+ */
+function exporter(columns, filename) {
+  let rows = [];
+  let key = null;
+  const button = h('button', { class: 'btn', type: 'button', disabled: true, onclick: () => {
     if (!rows.length) return toast('Tidak ada data untuk diekspor.', 'error');
-    downloadCsv(filename(), toCsv(rows, columns));
+    downloadCsv(filename(key), toCsv(rows, columns));
   } }, 'Export CSV');
+  return {
+    button,
+    reset() { rows = []; key = null; button.disabled = true; },
+    set(newRows, newKey) { rows = newRows; key = newKey; button.disabled = rows.length === 0; },
+  };
 }
 
 /* ---------------- Harian ---------------- */
 
 const HARIAN_CSV = [
-  { label: 'Nama', key: 'nama' }, { label: 'Instansi', key: 'instansi' }, { label: 'Email', key: 'email' },
+  { label: 'Tanggal', key: 'tanggal' }, { label: 'Nama', key: 'nama' }, { label: 'Instansi', key: 'instansi' }, { label: 'Email', key: 'email' },
   { label: 'Status', key: 'status' }, { label: 'Mode', key: 'mode' }, { label: 'Jam Masuk', key: 'jam_masuk' },
   { label: 'Jam Pulang', key: 'jam_pulang' }, { label: 'Lat Masuk', key: 'lat_masuk' }, { label: 'Lng Masuk', key: 'lng_masuk' },
-  { label: 'Jarak Masuk (m)', key: 'jarak_masuk' }, { label: 'Jarak Pulang (m)', key: 'jarak_pulang' },
+  { label: 'Akurasi Masuk (m)', key: 'akurasi_masuk' }, { label: 'Jarak Masuk (m)', key: 'jarak_masuk' },
+  { label: 'Lat Pulang', key: 'lat_pulang' }, { label: 'Lng Pulang', key: 'lng_pulang' },
+  { label: 'Akurasi Pulang (m)', key: 'akurasi_pulang' }, { label: 'Jarak Pulang (m)', key: 'jarak_pulang' },
   { label: 'Flags', key: 'flags' }, { label: 'Selfie Masuk', key: 'link_selfie_masuk' },
   { label: 'Selfie Pulang', key: 'link_selfie_pulang' }, { label: 'Surat', key: 'link_surat' }, { label: 'Catatan', key: 'catatan' },
 ];
@@ -41,15 +55,20 @@ function mapsUrl(lat, lng) {
 function renderHarian(el, me) {
   const tanggal = h('input', { type: 'date', value: me.today, max: me.today });
   const out = h('div');
-  let flat = [];
-  const load = () => loadInto(out, () => api('admin.harian', { tanggal: tanggal.value }), (rows) => {
-    flat = rows.map((r) => ({ nama: r.nama, instansi: r.instansi, email: r.email, ...(r.absensi || { status: 'Belum absen' }) }));
+  const exp = exporter(HARIAN_CSV, (day) => `presensi-${day}.csv`);
+  const load = () => {
+    const day = tanggal.value || me.today; // input kosong → jangan minta/ekspor tanggal kosong
+    exp.reset();
+    return loadInto(out, () => api('admin.harian', { tanggal: day }), (rows) => renderRows(rows, day));
+  };
+  const renderRows = (rows, day) => {
+    exp.set(rows.map((r) => ({ nama: r.nama, instansi: r.instansi, email: r.email, ...(r.absensi || { status: 'Belum absen' }), tanggal: day })), day);
     const hadir = rows.filter((r) => r.absensi?.status === 'Masuk').length;
     return h('div', {},
-      h('p', { class: 'muted' }, `${formatTanggal(tanggal.value)} · ${hadir} hadir dari ${rows.length} peserta`),
+      h('p', { class: 'muted' }, `${formatTanggal(day)} · ${hadir} hadir dari ${rows.length} peserta`),
       table([
         { label: 'Nama', render: (r) => h('div', {}, r.nama, h('div', { class: 'muted small' }, r.instansi)) },
-        { label: 'Status', render: (r) => badge(r.absensi?.status) },
+        { label: 'Status', render: (r) => h('div', {}, badge(r.absensi?.status), r.absensi?.catatan ? h('div', { class: 'muted small' }, r.absensi.catatan) : null) },
         { label: 'Mode', render: (r) => r.absensi?.mode || '' },
         { label: 'Masuk', render: (r) => r.absensi?.jam_masuk || '' },
         { label: 'Pulang', render: (r) => r.absensi?.jam_pulang || '' },
@@ -59,10 +78,9 @@ function renderHarian(el, me) {
           link(r.absensi?.link_selfie_masuk, 'Selfie masuk'), link(r.absensi?.link_selfie_pulang, 'Selfie pulang'),
           link(r.absensi?.link_surat, 'Surat'), link(mapsUrl(r.absensi?.lat_masuk, r.absensi?.lng_masuk), 'Lokasi')) },
       ], rows));
-  });
+  };
   tanggal.addEventListener('change', load);
-  el.append(toolbar(h('label', {}, 'Tanggal', tanggal),
-    exportButton(() => flat, HARIAN_CSV, () => `presensi-${tanggal.value}.csv`)), out);
+  el.append(toolbar(h('label', {}, 'Tanggal', tanggal), exp.button), out);
   load();
 }
 
@@ -74,20 +92,27 @@ const REKAP_COLS = [
   { label: 'Sakit', key: 'sakit' }, { label: 'Telat', key: 'telat' }, { label: 'Tanpa Ket.', key: 'tanpaKeterangan' },
 ];
 
+// Ekspor menambahkan Email setelah Nama (tabel di layar tidak, supaya muat di HP).
+const REKAP_CSV = [REKAP_COLS[0], { label: 'Email', key: 'email' }, ...REKAP_COLS.slice(1)];
+
 function renderRekap(el, me) {
   const month = h('input', { type: 'month', value: monthOf(me.today), max: monthOf(me.today) });
   const out = h('div');
-  let rows = [];
-  const load = () => loadInto(out, () => api('admin.rekap', { bulan: month.value }), (data) => {
-    rows = data;
+  const exp = exporter(REKAP_CSV, (bulan) => `rekap-${bulan}.csv`);
+  const load = () => {
+    const bulan = month.value || monthOf(me.today);
+    exp.reset();
+    return loadInto(out, () => api('admin.rekap', { bulan }), (data) => renderRows(data, bulan));
+  };
+  const renderRows = (data, bulan) => {
+    exp.set(data, bulan);
     return h('div', {},
-      h('h3', {}, `Rekap Presensi Magang Bawaslu Malang — ${month.value}`),
+      h('h3', {}, `Rekap Presensi Magang Bawaslu Malang — ${bulan}`),
       h('p', { class: 'muted small' }, 'Hari kerja = Senin–Jumat dalam periode magang sampai hari ini. Hadir bisa termasuk kerja di akhir pekan. Tanpa Ket. = hari kerja tanpa catatan presensi (hari ini belum dihitung).'),
       table(REKAP_COLS, data));
-  });
+  };
   month.addEventListener('change', load);
-  el.append(toolbar(h('label', {}, 'Bulan', month),
-    exportButton(() => rows, REKAP_COLS, () => `rekap-${month.value}.csv`),
+  el.append(toolbar(h('label', {}, 'Bulan', month), exp.button,
     h('button', { class: 'btn', type: 'button', onclick: () => window.print() }, 'Cetak / PDF')), out);
   load();
 }
@@ -104,24 +129,35 @@ function renderPeserta(el) {
     tanggal_selesai: h('input', { type: 'date' }),
   };
   const saveBtn = h('button', { class: 'btn primary', type: 'button' }, 'Simpan Peserta');
+  const editHint = h('p', { class: 'warn small hidden', 'aria-live': 'polite' });
+  let known = []; // peserta yang sudah dimuat, untuk mencegah email ganda saat menambah
   const resetBtn = h('button', { class: 'btn ghost', type: 'button', onclick: () => fill({}) }, 'Kosongkan');
   const out = h('div');
 
   function fill(p) {
     Object.entries(f).forEach(([k, input]) => { input.value = p[k] || (k === 'aktif' ? 'Y' : ''); });
     f.email.readOnly = Boolean(p.email);
+    editHint.textContent = p.email ? `Mode edit: ${p.email}` : '';
+    editHint.classList.toggle('hidden', !p.email);
   }
 
-  const load = () => loadInto(out, () => api('admin.peserta.list'), (rows) => (rows.length
+  const load = () => loadInto(out, () => api('admin.peserta.list'), (rows) => {
+    known = rows;
+    return rows.length
     ? table([
       { label: 'Nama', key: 'nama' }, { label: 'Email', key: 'email' }, { label: 'Instansi', key: 'instansi' },
       { label: 'Periode', render: (p) => `${p.tanggal_mulai} s/d ${p.tanggal_selesai}` },
       { label: 'Status', render: (p) => (p.aktif === 'Y' ? 'Aktif' : 'Nonaktif') },
       { label: '', render: (p) => h('button', { class: 'btn small', type: 'button', onclick: () => { fill(p); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, 'Edit') },
     ], rows)
-    : h('p', { class: 'muted' }, 'Belum ada peserta.')));
+    : h('p', { class: 'muted' }, 'Belum ada peserta.');
+  });
 
   saveBtn.addEventListener('click', async () => {
+    const email = f.email.value.trim().toLowerCase();
+    if (!f.email.readOnly && known.some((p) => String(p.email).trim().toLowerCase() === email)) {
+      return toast('Email sudah terdaftar. Klik Edit di tabel untuk mengubah.', 'error');
+    }
     setBusy(saveBtn, true, 'Menyimpan...');
     try {
       const data = Object.fromEntries(Object.entries(f).map(([k, input]) => [k, input.value]));
@@ -137,7 +173,7 @@ function renderPeserta(el) {
   });
 
   el.append(h('div', { class: 'card' },
-    h('h3', {}, 'Tambah / Edit Peserta'),
+    h('h3', {}, 'Tambah / Edit Peserta'), editHint,
     h('label', {}, 'Email Google', f.email), h('label', {}, 'Nama', f.nama), h('label', {}, 'Instansi', f.instansi),
     h('label', {}, 'Status', f.aktif), h('label', {}, 'Tanggal mulai', f.tanggal_mulai), h('label', {}, 'Tanggal selesai', f.tanggal_selesai),
     h('div', { class: 'row' }, saveBtn, resetBtn)), out);
@@ -156,24 +192,29 @@ function renderLogbook(el, me) {
   const month = h('input', { type: 'month', value: monthOf(me.today), max: monthOf(me.today) });
   const who = h('select', {}, h('option', { value: '' }, 'Semua peserta'));
   const out = h('div');
-  let rows = [];
+  const exp = exporter(LOGBOOK_CSV, ({ bulan, email }) => `logbook-${bulan}${email ? `-${email.split('@')[0].replace(/[^\w.-]/g, '_')}` : ''}.csv`);
 
   api('admin.peserta.list')
     .then((list) => list.forEach((p) => who.append(h('option', { value: p.email }, p.nama))))
     .catch((e) => toast(e.message, 'error'));
 
-  const load = () => loadInto(out, () => api('admin.logbook', { bulan: month.value, email: who.value }), (data) => {
-    rows = data;
+  const load = () => {
+    const key = { bulan: month.value || monthOf(me.today), email: who.value };
+    exp.reset();
+    return loadInto(out, () => api('admin.logbook', key), (data) => renderRows(data, key));
+  };
+  const renderRows = (data, key) => {
+    exp.set(data, key);
     return data.length
       ? table([
         { label: 'Tanggal', render: (r) => formatTanggal(r.tanggal) }, { label: 'Nama', key: 'nama' },
         { label: 'Kegiatan', key: 'kegiatan' }, { label: 'Lampiran', render: (r) => link(r.link_lampiran, 'lihat') },
       ], data)
       : h('p', { class: 'muted' }, 'Belum ada logbook.');
-  });
+  };
   month.addEventListener('change', load);
   who.addEventListener('change', load);
   el.append(toolbar(h('label', {}, 'Bulan', month), h('label', {}, 'Peserta', who),
-    exportButton(() => rows, LOGBOOK_CSV, () => `logbook-${month.value}.csv`)), out);
+    exp.button), out);
   load();
 }

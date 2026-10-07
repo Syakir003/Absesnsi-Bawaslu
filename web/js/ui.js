@@ -70,6 +70,14 @@ export function monthOf(dateStr) {
   return String(dateStr).slice(0, 7);
 }
 
+/** Geser tanggal 'yyyy-MM-dd' sebanyak n hari (aritmetika UTC, bebas zona waktu perangkat). */
+export function addDays(dateStr, n) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  t.setUTCDate(t.getUTCDate() + n);
+  return t.toISOString().slice(0, 10);
+}
+
 const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 export function formatTanggal(dateStr) {
@@ -91,6 +99,8 @@ export function segmented(options, initial, onChange, label) {
     });
     wrap.append(b);
   });
+  // Matikan/hidupkan semua pilihan (mis. saat form sedang mengirim).
+  wrap.setDisabled = (disabled) => wrap.querySelectorAll('button').forEach((x) => { x.disabled = Boolean(disabled); });
   return wrap;
 }
 
@@ -131,8 +141,13 @@ export function tabs(container, defs) {
     cleanup = defs.find((d) => d.id === id).render(body);
   };
   defs.forEach((d) => nav.append(h('button', { type: 'button', role: 'tab', 'aria-selected': 'false', 'data-tab': d.id, onclick: () => show(d.id) }, d.label)));
+  // Petunjuk visual (class "more") bila tab masih bisa digulir ke kanan.
+  const updateFade = () => nav.classList.toggle('more', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2);
+  nav.addEventListener('scroll', updateFade, { passive: true });
   container.append(nav, body);
   show(defs[0].id);
+  updateFade();
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(updateFade).observe(nav);
   return dispose;
 }
 

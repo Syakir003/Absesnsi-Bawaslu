@@ -9,6 +9,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 syst
 h1 { font-size: 1.5rem; margin: .5rem 0; } h3 { font-size: 1rem; margin: 0 0 .5rem; }
 .topbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
 .tabs { display: flex; gap: 4px; overflow-x: auto; margin-bottom: 12px; }
+.tabs.more { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
 .tabs button { border: 0; background: transparent; min-height: 44px; padding: 8px 14px; border-radius: 999px; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .tabs button.active { background: var(--primary); color: var(--primary-text); }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
@@ -23,9 +24,12 @@ h1 { font-size: 1.5rem; margin: .5rem 0; } h3 { font-size: 1rem; margin: 0 0 .5r
 .seg { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .seg button { flex: 1; border: 0; background: var(--card); padding: 10px; font: inherit; cursor: pointer; min-height: 44px; }
 .seg button.active { background: var(--primary); color: var(--primary-text); }
+.seg button:disabled { opacity: .6; cursor: not-allowed; }
 .seg button:focus-visible { outline: 2px solid var(--text); outline-offset: -3px; }
 input, textarea, select { width: 100%; font: inherit; font-size: 16px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
 label { display: block; margin-bottom: 8px; }
+label.strong { font-weight: 600; }
+label.strong input { font-weight: 400; }
 .cam { width: 100%; max-width: 360px; border-radius: 10px; background: #000; display: block; margin: 0 auto 8px; transform: scaleX(-1); }
 img.cam { transform: none; }
 .table-wrap { overflow-x: auto; }
