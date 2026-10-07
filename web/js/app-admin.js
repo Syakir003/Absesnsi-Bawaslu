@@ -3,13 +3,13 @@ import { h, toast, setBusy, link, monthOf, formatTanggal, table, badge, tabs, lo
 import { toCsv, downloadCsv } from './csv.js';
 import { withBusy, setDirty } from './busy.js';
 
-export function mountAdmin(main, me) {
+export function mountAdmin(main, me, initialTab) {
   return tabs(main, [
     { id: 'harian', label: 'Harian', render: (el) => renderHarian(el, me) },
     { id: 'rekap', label: 'Rekap Bulanan', render: (el) => renderRekap(el, me) },
     { id: 'peserta', label: 'Peserta', render: (el) => renderPeserta(el) },
     { id: 'logbook', label: 'Logbook', render: (el) => renderLogbook(el, me) },
-  ]);
+  ], initialTab);
 }
 
 function toolbar(...children) {

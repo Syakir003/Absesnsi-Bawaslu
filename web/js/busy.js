@@ -6,6 +6,17 @@ export function isBusy() {
   return active > 0;
 }
 
+// Pemanggil tunggal (main.js) yang diberi tahu saat aplikasi menjadi "idle": tidak sibuk dan tidak ada
+// form kotor. Dipanggil lewat setTimeout 0 supaya state sudah rapi (mis. tab sudah selesai berganti)
+// dan pemanggil tetap harus memeriksa ulang isBusy()/isDirty() saat dijalankan.
+let idleListener = null;
+export function onIdle(fn) {
+  idleListener = fn;
+}
+function notifyIfIdle() {
+  if (idleListener && active === 0 && dirtyKeys.size === 0) setTimeout(() => idleListener?.(), 0);
+}
+
 /** Jalankan fn (async) sambil menandai aplikasi sibuk; selalu dilepas di finally. */
 export async function withBusy(fn) {
   active += 1;
@@ -13,6 +24,7 @@ export async function withBusy(fn) {
     return await fn();
   } finally {
     active -= 1;
+    notifyIfIdle();
   }
 }
 
@@ -22,8 +34,11 @@ export async function withBusy(fn) {
 const dirtyKeys = new Set();
 
 export function setDirty(key, dirty) {
-  if (dirty) dirtyKeys.add(key);
-  else dirtyKeys.delete(key);
+  if (dirty) {
+    dirtyKeys.add(key);
+  } else if (dirtyKeys.delete(key)) {
+    notifyIfIdle();
+  }
 }
 
 export function isDirty() {

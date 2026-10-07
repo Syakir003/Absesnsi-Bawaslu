@@ -79,6 +79,12 @@ function handle(action, data) {
     const realNow = Date.now.bind(Date);
     window.__offset = 0;
     Date.now = () => realNow() + window.__offset;
+    // Majukan jam virtual sampai 3 detik sebelum tengah malam Asia/Jakarta berikutnya.
+    window.__toMidnight = () => {
+      const DAY = 24 * 3600 * 1000;
+      const intoDay = (Date.now() + 7 * 3600 * 1000) % DAY;
+      window.__offset += (DAY - 3000 - intoDay + DAY) % DAY;
+    };
     const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     navigator.mediaDevices.getUserMedia = async (c) => { const s = await orig(c); window.__streams.push(s); return s; };
   });
@@ -112,6 +118,8 @@ function handle(action, data) {
   const setVis = (st) => page.evaluate((v) => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v }); document.dispatchEvent(new Event('visibilitychange')); }, st);
   const away = async (ms) => { await setVis('hidden'); await page.evaluate((m) => { window.__offset += m; }, ms); await setVis('visible'); await sleep(700); };
   const MIN = 60 * 1000;
+  const waitMe = async (before, msg) => { for (let i = 0; i < 40 && count('me') === before; i++) await sleep(150); assert(count('me') > before, msg); };
+  const activeTab = () => page.locator('nav.tabs button.active').first().innerText();
   const noDriveLinks = async (where) => assert((await page.locator('a[href*="drive.google.com"]').count()) === 0, `peserta melihat link Drive di ${where}`);
 
   await page.goto(BASE);
@@ -173,6 +181,12 @@ function handle(action, data) {
   await away(25 * 60 * MIN);
   await page.getByText('Data belum disimpan — muat ulang setelah selesai.').waitFor();
   assert((await page.inputValue('textarea')) === 'ketikan belum disimpan' && count('me') === me0, 'ganti hari + form kotor memuat ulang'); step('foreground: ganti hari + form kotor → toast, tanpa muat ulang');
+  // Refresh tertunda berjalan otomatis begitu tidak ada yang kotor/sibuk (setelah logbook disimpan), tab tetap Logbook
+  await page.click('text=Simpan Logbook');
+  await waitMe(me0, 'refresh tertunda tidak jalan setelah logbook disimpan');
+  await page.getByText('Catatan kemarin').or(page.getByText('ketikan belum disimpan')).first().waitFor();
+  assert((await activeTab()) === 'Logbook', 'tab aktif berpindah setelah refresh tertunda: ' + await activeTab());
+  step('refresh tertunda jalan otomatis setelah simpan + tab Logbook dipertahankan');
 
   // Kamera harus mati saat ganti mode/tab/logout (semua stream yang pernah dibuka)
   absensi = null; await page.reload(); await waitVideo();
@@ -181,6 +195,8 @@ function handle(action, data) {
   await page.getByText('Lokasi terbaca').waitFor(); await page.click('text=Ambil Foto');
   me0 = count('me'); await away(6 * MIN);
   assert(await page.getByRole('button', { name: 'Ulangi Foto' }).isVisible() && count('me') === me0, 'selfie hilang/app dimuat ulang saat form check-in kotor'); step('foreground: selfie yang sudah diambil tidak hilang');
+  await page.click('text=Ulangi Foto'); await waitMe(me0, 'refresh tertunda tidak jalan setelah selfie dibuang');
+  await waitVideo(); step('refresh tertunda jalan setelah selfie dibuang');
   await page.click('.seg >> text=Izin'); await waitNoLive(); step('kamera mati setelah Masuk → Izin');
   await page.click('.seg >> text=Masuk'); await waitVideo();
   await page.click('nav >> text=Riwayat'); await waitNoLive(); step('kamera mati setelah pindah tab');
@@ -241,13 +257,28 @@ function handle(action, data) {
   assert(count('admin.peserta.save') === 1, 'email duplikat tetap dikirim ke server'); step('peserta: email duplikat diblokir');
   await away(6 * MIN);
   assert((await page.inputValue('input[type=email]')) === 'ANI@gmail.com' && count('me') === me0, 'form peserta yang kotor hilang/dimuat ulang'); step('foreground: form peserta kotor tidak dimuat ulang');
+  // Hanya ganti hari (hilang 6 detik melewati tengah malam): kotor → toast tanpa muat ulang
+  await page.evaluate(() => window.__toMidnight());
+  me0 = count('me'); await away(6000);
+  await page.getByText('Data belum disimpan — muat ulang setelah selesai.').waitFor();
+  assert((await page.inputValue('input[type=email]')) === 'ANI@gmail.com' && count('me') === me0, 'ganti hari + form peserta kotor memuat ulang'); step('foreground: ganti hari (6 detik) + form kotor → toast, tanpa muat ulang');
+  // Form dikosongkan → refresh tertunda jalan, tab Peserta tetap
+  await page.getByRole('button', { name: 'Kosongkan' }).click(); await waitMe(me0, 'refresh tertunda tidak jalan setelah form peserta dikosongkan');
+  await page.getByRole('button', { name: 'Edit' }).waitFor();
+  assert((await activeTab()) === 'Peserta', 'tab Peserta tidak dipertahankan'); step('refresh tertunda jalan setelah form peserta bersih + tab Peserta dipertahankan');
+  // Hanya ganti hari, tanpa form kotor → langsung muat ulang
+  await page.evaluate(() => window.__toMidnight());
+  me0 = count('me'); await away(6000); await waitMe(me0, 'ganti hari tanpa form kotor tidak memuat ulang'); step('foreground: ganti hari (6 detik) + bersih → muat ulang');
   await page.click('nav >> text=Logbook'); await page.getByRole('cell', { name: '=cmd' }).waitFor(); step('admin logbook (teks tidak dieksekusi)');
 
-  // (c) Tidak ada form kotor (tab admin Logbook): hilang >5 menit → dimuat ulang (kembali ke tab pertama)
+  // (c) Tidak ada form kotor, di tab Rekap: hilang ≥5 menit → dimuat ulang tapi tetap di tab Rekap (filter tidak dipertahankan)
+  await page.click('nav >> text=Rekap Bulanan'); await page.getByRole('cell', { name: 'Ani' }).waitFor();
   me0 = count('me');
-  await away(6 * MIN);
-  assert(count('me') > me0, 'app tidak dimuat ulang setelah 5 menit di background tanpa form kotor');
-  await page.getByText('1 hadir dari 2 peserta').waitFor(); step('foreground: bersih + ≥5 menit → muat ulang');
+  await away(6 * MIN); await waitMe(me0, 'app tidak dimuat ulang setelah 5 menit di background tanpa form kotor');
+  await page.getByRole('cell', { name: 'Ani' }).waitFor();
+  assert((await activeTab()) === 'Rekap Bulanan', 'tab Rekap tidak dipertahankan: ' + await activeTab());
+  assert((await page.inputValue('input[type=month]')) === '2026-10', 'filter bulan seharusnya kembali ke bawaan');
+  step('foreground: bersih + ≥5 menit → muat ulang, tetap di tab Rekap');
   // (d) Token kedaluwarsa → login
   await away(100 * 365 * 24 * 60 * MIN);
   await page.getByText('Sesi habis, silakan login lagi.').waitFor(); step('foreground: token kedaluwarsa → login');

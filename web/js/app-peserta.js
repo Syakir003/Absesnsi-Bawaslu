@@ -7,12 +7,12 @@ import { withBusy, setDirty } from './busy.js';
 // Upload foto/surat lewat jaringan HP bisa lambat: beri waktu 2 menit.
 const UPLOAD_OPTS = { timeoutMs: 120_000 };
 
-export function mountPeserta(main, me) {
+export function mountPeserta(main, me, initialTab) {
   return tabs(main, [
     { id: 'presensi', label: 'Presensi', render: (el) => renderPresensi(el, me) },
     { id: 'riwayat', label: 'Riwayat', render: (el) => renderRiwayat(el, me) },
     { id: 'logbook', label: 'Logbook', render: (el) => renderLogbook(el, me) },
-  ]);
+  ], initialTab);
 }
 
 /* ---------------- Presensi ---------------- */

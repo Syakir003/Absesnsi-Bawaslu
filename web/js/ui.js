@@ -119,12 +119,14 @@ export function badge(status) {
 
 /**
  * Tab sederhana. render(el) boleh mengembalikan fungsi cleanup (mis. matikan kamera).
- * Mengembalikan dispose(): menjalankan cleanup tab aktif (idempotent).
+ * initialId (opsional): tab yang dibuka pertama; id tak dikenal → tab pertama.
+ * Mengembalikan dispose(): menjalankan cleanup tab aktif (idempotent); dispose.current() = id tab aktif.
  */
-export function tabs(container, defs) {
+export function tabs(container, defs, initialId) {
   const nav = h('nav', { class: 'tabs', role: 'tablist' });
   const body = h('div', { role: 'tabpanel' });
   let cleanup = null;
+  let currentId = null;
   let observer = null;
   const cleanupTab = () => {
     const fn = cleanup;
@@ -139,6 +141,7 @@ export function tabs(container, defs) {
   };
   const show = (id) => {
     cleanupTab();
+    currentId = id;
     nav.querySelectorAll('button').forEach((b) => {
       const on = b.dataset.tab === id;
       b.classList.toggle('active', on);
@@ -152,9 +155,10 @@ export function tabs(container, defs) {
   const updateFade = () => nav.classList.toggle('more', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2);
   nav.addEventListener('scroll', updateFade, { passive: true });
   container.append(nav, body);
-  show(defs[0].id);
+  show(defs.some((d) => d.id === initialId) ? initialId : defs[0].id);
   updateFade();
   if (typeof ResizeObserver !== 'undefined') { observer = new ResizeObserver(updateFade); observer.observe(nav); }
+  dispose.current = () => currentId;
   return dispose;
 }
 
