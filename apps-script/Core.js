@@ -106,3 +106,42 @@ function resolveRole(email, admins, pesertaList, today) {
   if (!isPesertaActive(p, today)) return fail_('Akun kamu tidak aktif atau di luar periode magang.');
   return { ok: true, role: 'peserta', email: e, nama: p.nama || e, instansi: p.instansi || '' };
 }
+
+/* ---------- Waktu, teks & upload ---------- */
+
+function toSeconds(hms) {
+  var m = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(hms));
+  if (!m) throw new Error('Format jam tidak valid: ' + hms);
+  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] || 0);
+}
+
+function isLate(jamMasuk, batasTelat) {
+  if (!jamMasuk) return false;
+  return toSeconds(jamMasuk) > toSeconds(batasTelat);
+}
+
+function sanitizeText(s, maxLen) {
+  return String(s == null ? '' : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, maxLen);
+}
+
+function stripDataUrl(b64) {
+  return String(b64 || '').replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+}
+
+function base64Bytes(b64) {
+  var s = stripDataUrl(b64);
+  if (!s) return 0;
+  var padding = s.slice(-2) === '==' ? 2 : (s.slice(-1) === '=' ? 1 : 0);
+  return Math.floor(s.length * 3 / 4) - padding;
+}
+
+function validateUpload(file, kind) {
+  var rule = CORE_UPLOAD_RULES[kind];
+  if (!rule) return fail_('Jenis upload tidak dikenal.');
+  if (!file || !stripDataUrl(file.base64)) return fail_('File belum dipilih.');
+  if (rule.mimes.indexOf(file.mime) < 0) return fail_('Format file tidak didukung (' + file.mime + ').');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(stripDataUrl(file.base64))) return fail_('Isi file rusak.');
+  var bytes = base64Bytes(file.base64);
+  if (bytes > rule.maxBytes) return fail_('Ukuran file maksimal ' + (rule.maxBytes / 1024 / 1024) + ' MB.');
+  return { ok: true, bytes: bytes };
+}
