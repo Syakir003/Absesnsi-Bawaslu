@@ -14,3 +14,19 @@ function saveUpload_(file, kind, folderId, baseName) {
 function trashFile_(id) {
   try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { console.warn('Gagal hapus file ' + id, e); }
 }
+
+/** Buang file hanya bila ada di dalam folder presensi (URL di sheet bisa saja tautan sembarang). */
+function trashIfInFolder_(id, folderId) {
+  try {
+    var parents = DriveApp.getFileById(id).getParents();
+    while (parents.hasNext()) {
+      if (parents.next().getId() === folderId) {
+        trashFile_(id);
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('Lewati hapus file ' + id, e);
+  }
+  return false;
+}

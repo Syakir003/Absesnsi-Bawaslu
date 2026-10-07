@@ -77,15 +77,26 @@ function createGas({ tokenInfo = {}, now = new Date('2026-10-07T00:15:00Z') } = 
       DigestAlgorithm: { SHA_256: 'SHA_256' },
     },
     DriveApp: {
-      getFolderById: (id) => ({
-        getName: () => 'folder-' + id,
+      getFolderById: (folderId) => ({
+        getName: () => 'folder-' + folderId,
         createFile: (blob) => {
           const fid = 'f' + ++fileSeq;
-          files[fid] = { ...blob, trashed: false };
+          files[fid] = { ...blob, trashed: false, parent: folderId };
           return { getUrl: () => 'https://drive.google.com/file/d/' + fid, getId: () => fid };
         },
       }),
-      getFileById: (id) => ({ setTrashed: (t) => { files[id].trashed = t; } }),
+      getFileById: (id) => {
+        const f = files[id];
+        if (!f) throw new Error('Exception: Tidak dapat menemukan item dengan ID: ' + id);
+        return {
+          setTrashed: (t) => { f.trashed = t; },
+          getParents: () => {
+            const ids = f.parent ? [f.parent] : [];
+            let i = 0;
+            return { hasNext: () => i < ids.length, next: () => ({ getId: () => ids[i++] }) };
+          },
+        };
+      },
     },
     CacheService: {
       getScriptCache: () => ({

@@ -178,3 +178,24 @@ test('token: pra-filter bentuk JWT sebelum fetch tokeninfo', () => {
   assert.equal(gas.call('me', 'abc', {}).error, 'Sesi login tidak valid. Silakan login ulang.');
   assert.equal(gas.fetchCalls.length, 0);
 });
+
+test('logbook: lampiran lama di luar folder presensi TIDAK di-trash (link ditempel manual)', () => {
+  const gas = setupGas();
+  gas.call('logbook.save', 'tok.ani.sig', { tanggal: '2026-10-07', kegiatan: 'kegiatan a', lampiran: LAMPIRAN });
+  const other = gas.ctx.DriveApp.getFolderById('OTHER').createFile({ bytes: [1], mime: 'image/jpeg', name: 'lain.jpg' });
+  gas.sheets.Logbook.rows[1][4] = other.getUrl();
+  const res = gas.call('logbook.save', 'tok.ani.sig', { tanggal: '2026-10-07', kegiatan: 'kegiatan b', lampiran: LAMPIRAN2 });
+  assert.equal(res.ok, true, res.error);
+  assert.equal(gas.files[other.getId()].trashed, false);
+  assert.equal(gas.files.f1.trashed, false); // f1 tidak lagi direferensikan sheet, tapi bukan urusan di sini
+  assert.equal(gas.files[other.getId()].parent, 'OTHER');
+});
+
+test('logbook: lampiran lama berupa link Docs/id tak dikenal → tidak error, tidak ada yang di-trash', () => {
+  const gas = setupGas();
+  gas.call('logbook.save', 'tok.ani.sig', { tanggal: '2026-10-07', kegiatan: 'kegiatan a', lampiran: LAMPIRAN });
+  gas.sheets.Logbook.rows[1][4] = 'https://docs.google.com/document/d/unknownId123/edit';
+  const res = gas.call('logbook.save', 'tok.ani.sig', { tanggal: '2026-10-07', kegiatan: 'kegiatan b', lampiran: LAMPIRAN2 });
+  assert.equal(res.ok, true, res.error);
+  assert.equal(trashedCount(gas), 0);
+});

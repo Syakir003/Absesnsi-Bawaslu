@@ -128,8 +128,8 @@ function handleLogbookSave_(ctx) {
     insert_(SHEETS.LOGBOOK, row);
     return rowOut_(SHEETS.LOGBOOK, row);
   }); });
-  // Update sukses dengan lampiran baru: buang lampiran lama (di luar lock; error diabaikan trashFile_).
+  // Update sukses dengan lampiran baru: buang lampiran lama, hanya bila ada di folder presensi (di luar lock; error diabaikan).
   var oldId = driveFileIdFromUrl(oldUrl);
-  if (oldId) trashFile_(oldId);
+  if (oldId) trashIfInFolder_(oldId, c.folderId);
   return saved;
 }
