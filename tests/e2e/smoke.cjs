@@ -27,7 +27,7 @@ let absensi = null;
 let commitThenReject = true; // sekali: check-in tersimpan tapi responsnya ditolak (meniru retry setelah request yang sebenarnya sukses)
 let delayCheckinMs = 0; // tahan respons check-in supaya double submit bisa diuji
 const DELAY_ME_MS = 300; // lebar jendela balapan untuk login ganda
-const logbook = [];
+const logbook = [{ tanggal: '2026-10-06', kegiatan: 'Catatan kemarin', bisaEdit: true, link_lampiran: '' }];
 const calls = [];
 const count = (a) => calls.filter((c) => c === a).length;
 const cfg = { jamMasuk: '07:30', batasTelat: '08:00', radiusMeter: 100, batasEditLogbookHari: 1 };
@@ -75,6 +75,10 @@ function handle(action, data) {
   // Catat semua MediaStream yang pernah dibuka supaya kebocoran kamera terdeteksi walau elemen <video>-nya sudah hilang.
   await page.addInitScript(() => {
     window.__streams = [];
+    // Jam yang bisa dimajukan (window.__offset ms) untuk menguji muat ulang saat kembali ke aplikasi.
+    const realNow = Date.now.bind(Date);
+    window.__offset = 0;
+    Date.now = () => realNow() + window.__offset;
     const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     navigator.mediaDevices.getUserMedia = async (c) => { const s = await orig(c); window.__streams.push(s); return s; };
   });
@@ -104,6 +108,10 @@ function handle(action, data) {
   const waitNoLive = () => page.waitForFunction(() => window.__streams.flatMap((s) => s.getTracks()).every((t) => t.readyState === 'ended'), null, { timeout: 5000 });
   const waitVideo = () => page.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
   const scrollWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+  // Simulasi aplikasi di-background lalu kembali: sembunyikan, majukan jam, tampilkan lagi.
+  const setVis = (st) => page.evaluate((v) => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v }); document.dispatchEvent(new Event('visibilitychange')); }, st);
+  const away = async (ms) => { await setVis('hidden'); await page.evaluate((m) => { window.__offset += m; }, ms); await setVis('visible'); await sleep(700); };
+  const MIN = 60 * 1000;
   const noDriveLinks = async (where) => assert((await page.locator('a[href*="drive.google.com"]').count()) === 0, `peserta melihat link Drive di ${where}`);
 
   await page.goto(BASE);
@@ -151,10 +159,28 @@ function handle(action, data) {
   await page.click('nav >> text=Riwayat'); await page.click('nav >> text=Logbook');
   await page.waitForFunction(() => document.querySelector('textarea')?.value === 'Input data pemilih di sistem');
   await page.getByText('Logbook tanggal ini sudah ada — simpan akan memperbarui.').waitFor(); step('logbook terisi otomatis dari entri tersimpan');
+  // Ketikan belum disimpan + ganti ke tanggal yang sudah punya entri: teks dipertahankan, peringatan MENIMPA tampil
+  await page.fill('textarea', 'ketikan belum disimpan');
+  await page.fill('input[type=date]', '2026-10-06');
+  await page.getByText('Tanggal ini sudah punya logbook — menyimpan akan MENIMPA isinya.').waitFor();
+  assert((await page.inputValue('textarea')) === 'ketikan belum disimpan', 'ketikan pengguna tertimpa saat ganti tanggal'); step('logbook: ganti tanggal tidak menimpa ketikan + peringatan MENIMPA');
+  // (a) Kembali ke aplikasi setelah >5 menit dengan form kotor: tidak ada muat ulang, teks tetap
+  let me0 = count('me');
+  await away(6 * MIN);
+  assert((await page.inputValue('textarea')) === 'ketikan belum disimpan', 'teks logbook hilang setelah kembali ke aplikasi');
+  assert(count('me') === me0, 'app dimuat ulang walau form logbook belum disimpan'); step('foreground: form kotor (logbook) tidak dimuat ulang setelah 6 menit');
+  // Ganti hari + form kotor: tetap tidak dimuat ulang, tampil toast
+  await away(25 * 60 * MIN);
+  await page.getByText('Data belum disimpan — muat ulang setelah selesai.').waitFor();
+  assert((await page.inputValue('textarea')) === 'ketikan belum disimpan' && count('me') === me0, 'ganti hari + form kotor memuat ulang'); step('foreground: ganti hari + form kotor → toast, tanpa muat ulang');
 
   // Kamera harus mati saat ganti mode/tab/logout (semua stream yang pernah dibuka)
   absensi = null; await page.reload(); await waitVideo();
   assert((await liveTracks()) > 0, 'kamera seharusnya aktif');
+  // Selfie yang sudah diambil tidak boleh hilang karena kembali ke aplikasi setelah >5 menit
+  await page.getByText('Lokasi terbaca').waitFor(); await page.click('text=Ambil Foto');
+  me0 = count('me'); await away(6 * MIN);
+  assert(await page.getByRole('button', { name: 'Ulangi Foto' }).isVisible() && count('me') === me0, 'selfie hilang/app dimuat ulang saat form check-in kotor'); step('foreground: selfie yang sudah diambil tidak hilang');
   await page.click('.seg >> text=Izin'); await waitNoLive(); step('kamera mati setelah Masuk → Izin');
   await page.click('.seg >> text=Masuk'); await waitVideo();
   await page.click('nav >> text=Riwayat'); await waitNoLive(); step('kamera mati setelah pindah tab');
@@ -177,6 +203,8 @@ function handle(action, data) {
   await page.getByText('1 hadir dari 2 peserta').waitFor(); step('admin harian');
   assert((await scrollWidth()) <= 390, 'scroll horizontal di Admin Harian: ' + await scrollWidth()); step('tanpa scroll horizontal (Admin Harian)');
   assert(await page.locator('nav.tabs.more').count() === 1, 'tab admin overflow tanpa petunjuk (class "more")'); step('petunjuk overflow tab admin');
+  await page.fill('input[type=date]', '');
+  await page.waitForFunction(() => document.querySelector('input[type=date]').value === '2026-10-07'); step('harian: tanggal kosong dipulihkan ke hari ini');
   await page.getByText('Dari lapangan').waitFor(); step('catatan tampil di tabel harian');
   if (!(await page.getAttribute('a:text("Lokasi")', 'href')).includes('maps?q=-7.9667')) throw new Error('link lokasi salah');
   await page.screenshot({ path: path.join(OUT, 'shot-admin.png'), fullPage: true });
@@ -197,6 +225,12 @@ function handle(action, data) {
   await page.fill('input[type=month]', '2026-10');
   await page.getByRole('cell', { name: 'Ani' }).waitFor();
   assert(!(await page.getByRole('button', { name: 'Export CSV' }).isDisabled()), 'Export CSV tetap nonaktif setelah muat berhasil'); step('export aktif lagi setelah muat berhasil');
+  // (b) Admin di tab Rekap dengan bulan non-default: hilang 10 detik tidak boleh mereset tab/filter
+  await page.fill('input[type=month]', '2026-08'); await page.getByRole('cell', { name: 'Ani' }).waitFor();
+  me0 = count('me');
+  await away(10 * 1000);
+  assert((await page.inputValue('input[type=month]')) === '2026-08' && count('me') === me0, 'tab/bulan rekap direset setelah background singkat');
+  assert(await page.locator('nav.tabs button.active', { hasText: 'Rekap Bulanan' }).count() === 1, 'tab aktif berpindah'); step('foreground: background singkat tidak mereset tab Rekap + filter bulan');
   await page.click('nav >> text=Peserta'); await page.getByRole('button', { name: 'Edit' }).click();
   if ((await page.inputValue('input[type=email]')) !== 'ani@gmail.com') throw new Error('edit tidak isi form');
   await page.getByText('Mode edit: ani@gmail.com').waitFor();
@@ -205,17 +239,17 @@ function handle(action, data) {
   await page.fill('input[type=email]', 'ANI@gmail.com'); await page.fill('input[maxlength="100"]', 'Ani Dobel');
   await page.click('text=Simpan Peserta'); await page.getByText('Email sudah terdaftar. Klik Edit di tabel untuk mengubah.').waitFor();
   assert(count('admin.peserta.save') === 1, 'email duplikat tetap dikirim ke server'); step('peserta: email duplikat diblokir');
+  await away(6 * MIN);
+  assert((await page.inputValue('input[type=email]')) === 'ANI@gmail.com' && count('me') === me0, 'form peserta yang kotor hilang/dimuat ulang'); step('foreground: form peserta kotor tidak dimuat ulang');
   await page.click('nav >> text=Logbook'); await page.getByRole('cell', { name: '=cmd' }).waitFor(); step('admin logbook (teks tidak dieksekusi)');
 
-  // Kembali ke aplikasi (foreground): data dimuat ulang setelah ≥5 menit, sesi habis → login
-  const realNow = await page.evaluate(() => { window.__realNow = Date.now.bind(Date); return 0; });
-  const meBefore = count('me');
-  await page.evaluate(() => { Date.now = () => window.__realNow() + 6 * 60 * 1000; document.dispatchEvent(new Event('visibilitychange')); });
-  await page.waitForFunction(() => document.querySelector('nav.tabs'), null, { timeout: 5000 });
-  for (let i = 0; i < 20 && count('me') === meBefore; i++) await sleep(250);
-  assert(count('me') > meBefore, 'app tidak dimuat ulang setelah 5 menit di background'); step('foreground: muat ulang setelah ≥5 menit');
-  await page.getByText('1 hadir dari 2 peserta').waitFor();
-  await page.evaluate(() => { Date.now = () => window.__realNow() + 100 * 365 * 24 * 3600 * 1000; document.dispatchEvent(new Event('visibilitychange')); });
+  // (c) Tidak ada form kotor (tab admin Logbook): hilang >5 menit → dimuat ulang (kembali ke tab pertama)
+  me0 = count('me');
+  await away(6 * MIN);
+  assert(count('me') > me0, 'app tidak dimuat ulang setelah 5 menit di background tanpa form kotor');
+  await page.getByText('1 hadir dari 2 peserta').waitFor(); step('foreground: bersih + ≥5 menit → muat ulang');
+  // (d) Token kedaluwarsa → login
+  await away(100 * 365 * 24 * 60 * MIN);
   await page.getByText('Sesi habis, silakan login lagi.').waitFor(); step('foreground: token kedaluwarsa → login');
 
   await browser.close(); server.close();

@@ -1,7 +1,7 @@
 import { renderLogin, getToken, logout, waitForGsi } from './auth.js';
 import { api } from './api.js';
-import { h, clear } from './ui.js';
-import { isBusy } from './busy.js';
+import { h, clear, toast } from './ui.js';
+import { isBusy, isDirty, clearDirty } from './busy.js';
 import { mountPeserta } from './app-peserta.js';
 import { mountAdmin } from './app-admin.js';
 
@@ -9,16 +9,17 @@ const root = document.getElementById('app');
 let disposeApp = null; // matikan kamera/cleanup tab aktif sebelum layar diganti
 let loadGen = 0; // nomor generasi: hanya loadApp() terbaru yang boleh mount (cegah mount ganda/kamera bocor)
 let mounted = false; // aplikasi (bukan layar login/loading/error) sedang tampil
-let loadedAt = 0;
 let loadedDay = '';
+let hiddenAt = null; // kapan aplikasi terakhir masuk background (null = sedang tampil)
 
 const REFRESH_AFTER_MS = 5 * 60 * 1000;
-const todayJakarta = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+const todayJakarta = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(Date.now()));
 
 function teardown() {
   const fn = disposeApp;
   disposeApp = null;
   if (typeof fn === 'function') fn();
+  clearDirty(); // jaring pengaman: tidak ada penanda form kotor yang bocor ke mount berikutnya
 }
 
 function showLogin(message) {
@@ -60,7 +61,6 @@ async function loadApp() {
     root.append(main);
     disposeApp = me.role === 'admin' ? mountAdmin(main, me) : mountPeserta(main, me);
     mounted = true;
-    loadedAt = Date.now();
     loadedDay = todayJakarta();
   } catch (e) {
     if (e.code === 'AUTH') {
@@ -76,13 +76,28 @@ async function loadApp() {
   }
 }
 
-// Kembali ke aplikasi setelah di background: sesi habis → login; data lama (≥5 menit atau ganti hari) → muat ulang.
-// Tidak memuat ulang saat ada submit berjalan (busy.js) supaya form yang sedang mengirim tidak hilang.
+// Kembali ke aplikasi setelah di background:
+// - sesi habis → login;
+// - muat ulang data hanya bila sempat di background ≥5 menit ATAU hari (Asia/Jakarta) berganti sejak dimuat;
+// - tidak pernah memuat ulang saat ada submit berjalan atau form berisi isian belum tersimpan (busy.js),
+//   supaya foto/catatan/teks logbook tidak hilang. Bila hari berganti dan muat ulang ditunda, beri tahu pengguna.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible' || !mounted) return;
+  if (document.visibilityState === 'hidden') {
+    hiddenAt = Date.now();
+    return;
+  }
+  if (document.visibilityState !== 'visible') return;
+  const awayMs = hiddenAt === null ? 0 : Date.now() - hiddenAt;
+  hiddenAt = null;
+  if (!mounted) return;
   if (!getToken()) return showLogin('Sesi habis, silakan login lagi.');
-  if (isBusy()) return;
-  if (Date.now() - loadedAt >= REFRESH_AFTER_MS || todayJakarta() !== loadedDay) loadApp();
+  const dateChanged = todayJakarta() !== loadedDay;
+  if (awayMs < REFRESH_AFTER_MS && !dateChanged) return;
+  if (isBusy() || isDirty()) {
+    if (dateChanged) toast('Data belum disimpan — muat ulang setelah selesai.', 'info');
+    return;
+  }
+  loadApp();
 });
 
 window.addEventListener('auth-expired', (ev) => showLogin(ev.detail || 'Sesi habis, silakan login lagi.'));

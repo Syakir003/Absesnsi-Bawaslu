@@ -125,13 +125,20 @@ export function tabs(container, defs) {
   const nav = h('nav', { class: 'tabs', role: 'tablist' });
   const body = h('div', { role: 'tabpanel' });
   let cleanup = null;
-  const dispose = () => {
+  let observer = null;
+  const cleanupTab = () => {
     const fn = cleanup;
     cleanup = null;
     if (typeof fn === 'function') fn();
   };
+  // dispose akhir: cleanup tab aktif + lepas ResizeObserver (idempotent)
+  const dispose = () => {
+    observer?.disconnect();
+    observer = null;
+    cleanupTab();
+  };
   const show = (id) => {
-    dispose();
+    cleanupTab();
     nav.querySelectorAll('button').forEach((b) => {
       const on = b.dataset.tab === id;
       b.classList.toggle('active', on);
@@ -147,7 +154,7 @@ export function tabs(container, defs) {
   container.append(nav, body);
   show(defs[0].id);
   updateFade();
-  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(updateFade).observe(nav);
+  if (typeof ResizeObserver !== 'undefined') { observer = new ResizeObserver(updateFade); observer.observe(nav); }
   return dispose;
 }
 

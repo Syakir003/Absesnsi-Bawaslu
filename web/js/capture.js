@@ -2,7 +2,7 @@ import { api } from './api.js';
 import { h, toast, setBusy } from './ui.js';
 import { getPosition } from './geo.js';
 import { openCamera, stopCamera, captureFrame } from './camera.js';
-import { withBusy } from './busy.js';
+import { withBusy, setDirty } from './busy.js';
 
 /**
  * Submit ditolak. Selalu toast pesannya. Untuk ApiError USER (mis. 'sudah mengisi presensi hari ini'
@@ -90,6 +90,7 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
     if (submitting) return;
     if (!video.videoWidth) return toast('Kamera belum siap.', 'error');
     photo = captureFrame(video);
+    setDirty('capture', true); // foto sudah diambil: jangan hilang karena muat ulang
     preview.src = `data:image/jpeg;base64,${photo.base64}`;
     video.classList.add('hidden');
     preview.classList.remove('hidden');
@@ -101,6 +102,7 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
   retakeBtn.addEventListener('click', () => {
     if (submitting) return;
     photo = null;
+    setDirty('capture', false);
     preview.classList.add('hidden');
     video.classList.remove('hidden');
     shotBtn.classList.remove('hidden');
@@ -119,6 +121,7 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
     await withBusy(async () => {
       try {
         await onSubmit({ ...pos, selfie: photo, ...(getExtra ? getExtra() : {}) });
+        setDirty('capture', false);
         return; // sukses: pemanggil menggambar ulang view
       } catch (e) {
         if (await handleSubmitError(e, me)) return onStale();
@@ -134,6 +137,7 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
   startCamera();
   return () => {
     disposed = true;
+    setDirty('capture', false);
     stopCamera(stream);
   };
 }

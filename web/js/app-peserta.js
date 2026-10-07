@@ -2,7 +2,7 @@ import { api } from './api.js';
 import { h, clear, toast, setBusy, monthOf, addDays, formatTanggal, segmented, table, badge, tabs, loadInto } from './ui.js';
 import { prepareUpload } from './file.js';
 import { captureFlow, handleSubmitError } from './capture.js';
-import { withBusy } from './busy.js';
+import { withBusy, setDirty } from './busy.js';
 
 // Upload foto/surat lewat jaringan HP bisa lambat: beri waktu 2 menit.
 const UPLOAD_OPTS = { timeoutMs: 120_000 };
@@ -72,7 +72,11 @@ function checkInForm(el, me, done) {
   let sending = false; // Izin/Sakit sedang diunggah
   const area = h('div');
   const catatan = h('textarea', { rows: 2, maxlength: 500 });
-  const statusSeg = segmented(['Masuk', 'Izin', 'Sakit'], status, (v) => { status = v; drawArea(); }, 'Keterangan presensi');
+  let fileEl = null; // input surat (Izin/Sakit) yang sedang tampil
+  // Form dianggap kotor bila ada catatan, pilihan bukan bawaan (Masuk/WFO), atau file surat dipilih.
+  const updateDirty = () => setDirty('checkin', catatan.value !== '' || status !== 'Masuk' || mode !== 'WFO' || Boolean(fileEl?.files?.length));
+  catatan.addEventListener('input', updateDirty);
+  const statusSeg = segmented(['Masuk', 'Izin', 'Sakit'], status, (v) => { status = v; drawArea(); updateDirty(); }, 'Keterangan presensi');
 
   el.append(h('div', { class: 'card' }, h('h3', {}, 'Keterangan'), statusSeg), area);
 
@@ -84,9 +88,10 @@ function checkInForm(el, me, done) {
     flowCleanup?.();
     flowCleanup = null;
     modeSeg = null;
+    fileEl = null;
     clear(area);
     if (status === 'Masuk') {
-      modeSeg = segmented(['WFO', 'WFH'], mode, (v) => { mode = v; }, 'Mode kerja');
+      modeSeg = segmented(['WFO', 'WFH'], mode, (v) => { mode = v; updateDirty(); }, 'Mode kerja');
       area.append(
         h('div', { class: 'card' }, h('h3', {}, 'Mode kerja'), modeSeg,
           h('p', { class: 'muted small' }, `WFO wajib dalam radius ${me.config.radiusMeter} m dari kantor.`)),
@@ -106,6 +111,8 @@ function checkInForm(el, me, done) {
       return;
     }
     const fileInput = h('input', { type: 'file', accept: 'image/jpeg,image/png,application/pdf' });
+    fileEl = fileInput;
+    fileInput.addEventListener('change', updateDirty);
     const btn = h('button', { class: 'btn primary block', type: 'button' }, `Kirim ${status}`);
     btn.addEventListener('click', async () => {
       if (sending) return;
@@ -135,7 +142,10 @@ function checkInForm(el, me, done) {
   }
 
   drawArea();
-  return () => flowCleanup?.();
+  return () => {
+    setDirty('checkin', false);
+    flowCleanup?.();
+  };
 }
 
 /* ---------------- Riwayat ---------------- */
@@ -165,12 +175,17 @@ function renderLogbook(el, me) {
   const kegiatan = h('textarea', { rows: 4, maxlength: 2000, placeholder: 'Apa saja yang kamu kerjakan hari ini?' });
   const lampiran = h('input', { type: 'file', accept: 'image/jpeg,image/png,application/pdf' });
   const saveBtn = h('button', { class: 'btn primary block', type: 'button' }, 'Simpan Logbook');
-  const existsHint = h('p', { class: 'success small hidden', 'aria-live': 'polite' }, 'Logbook tanggal ini sudah ada — simpan akan memperbarui.');
+  const HINT_UPDATE = 'Logbook tanggal ini sudah ada — simpan akan memperbarui.';
+  const HINT_OVERWRITE = 'Tanggal ini sudah punya logbook — menyimpan akan MENIMPA isinya.';
+  const existsHint = h('p', { class: 'success small hidden', 'aria-live': 'polite' }, HINT_UPDATE);
   const month = h('input', { type: 'month', value: monthOf(me.today), max: monthOf(me.today) });
   const out = h('div');
 
   const byMonth = new Map(); // bulan -> baris logbook (untuk mengisi otomatis entri yang sudah ada)
   let prefilled = ''; // teks yang kita isikan sendiri; hanya teks ini (atau kosong) yang boleh ditimpa
+
+  // Kotor = teks berbeda dari yang terakhir diisi/disimpan, atau ada lampiran yang dipilih.
+  const updateDirty = () => setDirty('logbook', kegiatan.value !== prefilled || Boolean(lampiran.files?.length));
 
   const rowFor = (date) => byMonth.get(monthOf(date))?.find((r) => r.tanggal === date);
 
@@ -181,7 +196,11 @@ function renderLogbook(el, me) {
       kegiatan.value = row ? row.kegiatan : '';
       prefilled = kegiatan.value;
     }
-    existsHint.classList.toggle('hidden', !row);
+    // Ketikan pengguna dipertahankan walau tanggal baru sudah punya entri → peringatkan bahwa simpan akan menimpa.
+    const overwrite = Boolean(row) && kegiatan.value !== row.kegiatan;
+    existsHint.textContent = overwrite ? HINT_OVERWRITE : HINT_UPDATE;
+    existsHint.className = `${overwrite ? 'warn' : 'success'} small${row ? '' : ' hidden'}`;
+    updateDirty();
   }
 
   async function onDateChange() {
@@ -229,11 +248,14 @@ function renderLogbook(el, me) {
         toast(e.message, 'error');
       } finally {
         setBusy(saveBtn, false);
+        updateDirty();
       }
     });
   });
   month.addEventListener('change', load);
   tanggal.addEventListener('change', onDateChange);
+  kegiatan.addEventListener('input', updateDirty);
+  lampiran.addEventListener('change', updateDirty);
 
   el.append(
     h('div', { class: 'card' },
@@ -246,4 +268,5 @@ function renderLogbook(el, me) {
     h('div', { class: 'card' }, h('label', {}, 'Bulan', month)),
     out);
   load();
+  return () => setDirty('logbook', false);
 }

@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { h, toast, setBusy, link, monthOf, formatTanggal, table, badge, tabs, loadInto } from './ui.js';
 import { toCsv, downloadCsv } from './csv.js';
+import { withBusy, setDirty } from './busy.js';
 
 export function mountAdmin(main, me) {
   return tabs(main, [
@@ -57,7 +58,8 @@ function renderHarian(el, me) {
   const out = h('div');
   const exp = exporter(HARIAN_CSV, (day) => `presensi-${day}.csv`);
   const load = () => {
-    const day = tanggal.value || me.today; // input kosong → jangan minta/ekspor tanggal kosong
+    if (!tanggal.value) tanggal.value = me.today; // input kosong → pulihkan, jangan minta/ekspor tanggal kosong
+    const day = tanggal.value;
     exp.reset();
     return loadInto(out, () => api('admin.harian', { tanggal: day }), (rows) => renderRows(rows, day));
   };
@@ -100,7 +102,8 @@ function renderRekap(el, me) {
   const out = h('div');
   const exp = exporter(REKAP_CSV, (bulan) => `rekap-${bulan}.csv`);
   const load = () => {
-    const bulan = month.value || monthOf(me.today);
+    if (!month.value) month.value = monthOf(me.today);
+    const bulan = month.value;
     exp.reset();
     return loadInto(out, () => api('admin.rekap', { bulan }), (data) => renderRows(data, bulan));
   };
@@ -128,7 +131,9 @@ function renderPeserta(el) {
     tanggal_mulai: h('input', { type: 'date' }),
     tanggal_selesai: h('input', { type: 'date' }),
   };
-  const saveBtn = h('button', { class: 'btn primary', type: 'button' }, 'Simpan Peserta');
+  const saveBtn = h('button', { class: 'btn primary', type: 'button', disabled: true }, 'Simpan Peserta');
+  let listLoaded = false; // simpan baru boleh setelah daftar termuat (cek email ganda butuh daftar)
+  let base = {}; // isian form saat terakhir diisi (fill) untuk mendeteksi form kotor
   const editHint = h('p', { class: 'warn small hidden', 'aria-live': 'polite' });
   let known = []; // peserta yang sudah dimuat, untuk mencegah email ganda saat menambah
   const resetBtn = h('button', { class: 'btn ghost', type: 'button', onclick: () => fill({}) }, 'Kosongkan');
@@ -139,10 +144,23 @@ function renderPeserta(el) {
     f.email.readOnly = Boolean(p.email);
     editHint.textContent = p.email ? `Mode edit: ${p.email}` : '';
     editHint.classList.toggle('hidden', !p.email);
+    base = Object.fromEntries(Object.entries(f).map(([k, input]) => [k, input.value]));
+    updateDirty();
   }
 
-  const load = () => loadInto(out, () => api('admin.peserta.list'), (rows) => {
+  function updateDirty() {
+    setDirty('peserta', Object.entries(f).some(([k, input]) => input.value !== base[k]));
+  }
+
+  const load = () => {
+    listLoaded = false;
+    saveBtn.disabled = true;
+    return loadInto(out, () => api('admin.peserta.list'), renderList);
+  };
+  const renderList = (rows) => {
     known = rows;
+    listLoaded = true;
+    saveBtn.disabled = false;
     return rows.length
     ? table([
       { label: 'Nama', key: 'nama' }, { label: 'Email', key: 'email' }, { label: 'Instansi', key: 'instansi' },
@@ -151,7 +169,7 @@ function renderPeserta(el) {
       { label: '', render: (p) => h('button', { class: 'btn small', type: 'button', onclick: () => { fill(p); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, 'Edit') },
     ], rows)
     : h('p', { class: 'muted' }, 'Belum ada peserta.');
-  });
+  };
 
   saveBtn.addEventListener('click', async () => {
     const email = f.email.value.trim().toLowerCase();
@@ -159,18 +177,22 @@ function renderPeserta(el) {
       return toast('Email sudah terdaftar. Klik Edit di tabel untuk mengubah.', 'error');
     }
     setBusy(saveBtn, true, 'Menyimpan...');
-    try {
-      const data = Object.fromEntries(Object.entries(f).map(([k, input]) => [k, input.value]));
-      await api('admin.peserta.save', data);
-      toast('Peserta tersimpan.', 'success');
-      fill({});
-      load();
-    } catch (e) {
-      toast(e.message, 'error');
-    } finally {
-      setBusy(saveBtn, false);
-    }
+    await withBusy(async () => {
+      try {
+        const data = Object.fromEntries(Object.entries(f).map(([k, input]) => [k, input.value]));
+        await api('admin.peserta.save', data);
+        toast('Peserta tersimpan.', 'success');
+        fill({});
+        load();
+      } catch (e) {
+        toast(e.message, 'error');
+      } finally {
+        setBusy(saveBtn, false);
+        saveBtn.disabled = !listLoaded;
+      }
+    });
   });
+  Object.values(f).forEach((input) => { input.addEventListener('input', updateDirty); input.addEventListener('change', updateDirty); });
 
   el.append(h('div', { class: 'card' },
     h('h3', {}, 'Tambah / Edit Peserta'), editHint,
@@ -179,6 +201,7 @@ function renderPeserta(el) {
     h('div', { class: 'row' }, saveBtn, resetBtn)), out);
   fill({});
   load();
+  return () => setDirty('peserta', false);
 }
 
 /* ---------------- Logbook ---------------- */
@@ -199,7 +222,8 @@ function renderLogbook(el, me) {
     .catch((e) => toast(e.message, 'error'));
 
   const load = () => {
-    const key = { bulan: month.value || monthOf(me.today), email: who.value };
+    if (!month.value) month.value = monthOf(me.today);
+    const key = { bulan: month.value, email: who.value };
     exp.reset();
     return loadInto(out, () => api('admin.logbook', key), (data) => renderRows(data, key));
   };
