@@ -26,7 +26,12 @@ function handlers_() {
     'absen.checkout': { role: 'peserta', fn: handleCheckOut_ },
     'absen.riwayat': { role: 'peserta', fn: handleRiwayat_ },
     'logbook.list': { role: 'peserta', fn: handleLogbookList_ },
-    'logbook.save': { role: 'peserta', fn: handleLogbookSave_ }
+    'logbook.save': { role: 'peserta', fn: handleLogbookSave_ },
+    'admin.harian': { role: 'admin', fn: handleAdminHarian_ },
+    'admin.rekap': { role: 'admin', fn: handleAdminRekap_ },
+    'admin.peserta.list': { role: 'admin', fn: handleAdminPesertaList_ },
+    'admin.peserta.save': { role: 'admin', fn: handleAdminPesertaSave_ },
+    'admin.logbook': { role: 'admin', fn: handleAdminLogbook_ }
   };
 }
 
