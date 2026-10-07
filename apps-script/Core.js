@@ -218,3 +218,62 @@ function validatePeserta(input) {
     }
   };
 }
+
+/* ---------- Rekap ---------- */
+
+function monthBounds(bulan) {
+  var p = bulan.split('-').map(Number);
+  var last = new Date(Date.UTC(p[0], p[1], 0)).getUTCDate();
+  return { first: bulan + '-01', last: bulan + '-' + (last < 10 ? '0' : '') + last };
+}
+
+function workdaysInRange(start, end) {
+  var out = [];
+  if (end < start) return out;
+  var s = start.split('-').map(Number);
+  var d = new Date(Date.UTC(s[0], s[1] - 1, s[2]));
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  for (var i = 0; i < 400; i++) {
+    var key = d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+    if (key > end) break;
+    var dow = d.getUTCDay();
+    if (dow !== 0 && dow !== 6) out.push(key);
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+function buildRekap(pesertaList, absensiRows, bulan, today, batasTelat) {
+  var b = monthBounds(bulan);
+  return pesertaList
+    .filter(function (p) {
+      return (!p.tanggal_mulai || p.tanggal_mulai <= b.last) && (!p.tanggal_selesai || p.tanggal_selesai >= b.first);
+    })
+    .map(function (p) {
+      var email = String(p.email).toLowerCase().trim();
+      var start = [b.first, p.tanggal_mulai || b.first].sort()[1];
+      var end = [b.last, p.tanggal_selesai || b.last, today].sort()[0];
+      var hariKerja = workdaysInRange(start, end);
+      var rows = absensiRows.filter(function (r) {
+        return String(r.email).toLowerCase().trim() === email && r.tanggal >= b.first && r.tanggal <= b.last;
+      });
+      var tercatat = {};
+      var r = { email: email, nama: p.nama, instansi: p.instansi || '', hariKerja: hariKerja.length,
+        hadir: 0, wfo: 0, wfh: 0, izin: 0, sakit: 0, telat: 0, tanpaKeterangan: 0 };
+      rows.forEach(function (row) {
+        tercatat[row.tanggal] = true;
+        if (row.status === 'Masuk') {
+          r.hadir++;
+          if (row.mode === 'WFO') r.wfo++;
+          if (row.mode === 'WFH') r.wfh++;
+          if (isLate(row.jam_masuk, batasTelat)) r.telat++;
+        } else if (row.status === 'Izin') {
+          r.izin++;
+        } else if (row.status === 'Sakit') {
+          r.sakit++;
+        }
+      });
+      r.tanpaKeterangan = hariKerja.filter(function (d) { return !tercatat[d]; }).length;
+      return r;
+    });
+}
