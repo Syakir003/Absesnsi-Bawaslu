@@ -145,3 +145,39 @@ function validateUpload(file, kind) {
   if (bytes > rule.maxBytes) return fail_('Ukuran file maksimal ' + (rule.maxBytes / 1024 / 1024) + ' MB.');
   return { ok: true, bytes: bytes };
 }
+
+/* ---------- Presensi ---------- */
+
+function checkLocation_(input, mode, config) {
+  if (!isFiniteNum_(input.lat) || !isFiniteNum_(input.lng) || !isFiniteNum_(input.accuracy)) {
+    return fail_('Lokasi GPS tidak terbaca. Aktifkan GPS lalu coba lagi.');
+  }
+  var distance = Math.round(haversineMeters(input.lat, input.lng, config.kantorLat, config.kantorLng));
+  var flags = [];
+  if (input.accuracy > config.maxAkurasiMeter) flags.push('AKURASI_RENDAH');
+  if (mode === 'WFO' && distance > config.radiusMeter) {
+    return fail_('Kamu berada ' + distance + ' m dari kantor (maks ' + config.radiusMeter +
+      ' m). Kalau memang kerja dari rumah, pilih WFH.');
+  }
+  return { ok: true, distance: distance, flags: flags };
+}
+
+function validateCheckIn(input, existing, config) {
+  if (existing) return fail_('Kamu sudah mengisi presensi hari ini (' + existing.status + ').');
+  if (CORE_STATUS.indexOf(input.status) < 0) return fail_('Status tidak valid.');
+  if (input.status === 'Masuk') {
+    if (CORE_MODE.indexOf(input.mode) < 0) return fail_('Pilih mode WFO atau WFH.');
+    if (!input.hasSelfie) return fail_('Selfie wajib untuk absen masuk.');
+    return checkLocation_(input, input.mode, config);
+  }
+  if (!input.hasSurat) return fail_('Izin/Sakit wajib melampirkan surat (foto atau PDF).');
+  return { ok: true, distance: null, flags: [] };
+}
+
+function validateCheckOut(input, existing, config) {
+  if (!existing) return fail_('Kamu belum absen masuk hari ini.');
+  if (existing.status !== 'Masuk') return fail_('Hari ini kamu tercatat ' + existing.status + ', tidak perlu absen pulang.');
+  if (existing.jam_pulang) return fail_('Kamu sudah absen pulang hari ini.');
+  if (!input.hasSelfie) return fail_('Selfie wajib untuk absen pulang.');
+  return checkLocation_(input, existing.mode, config);
+}
