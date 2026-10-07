@@ -7,9 +7,15 @@
 var CORE_STATUS = ['Masuk', 'Izin', 'Sakit'];
 var CORE_MODE = ['WFO', 'WFH'];
 var CORE_UPLOAD_RULES = {
-  selfie: { mimes: ['image/jpeg'], maxBytes: 1.5 * 1024 * 1024 },
-  surat: { mimes: ['image/jpeg', 'image/png', 'application/pdf'], maxBytes: 2 * 1024 * 1024 },
-  lampiran: { mimes: ['image/jpeg', 'image/png', 'application/pdf'], maxBytes: 2 * 1024 * 1024 }
+  selfie: { mimes: ['image/jpeg'], minBytes: 1024, maxBytes: 1.5 * 1024 * 1024 },
+  surat: { mimes: ['image/jpeg', 'image/png', 'application/pdf'], minBytes: 100, maxBytes: 2 * 1024 * 1024 },
+  lampiran: { mimes: ['image/jpeg', 'image/png', 'application/pdf'], minBytes: 100, maxBytes: 2 * 1024 * 1024 }
+};
+// Awalan base64 dari magic bytes tiap format (JPEG FF D8 FF, PNG 89 50 4E 47 0D 0A 1A 0A, PDF "%PDF-").
+var CORE_MAGIC_PREFIX = {
+  'image/jpeg': '/9j/',
+  'image/png': 'iVBORw0KGgo',
+  'application/pdf': 'JVBERi0'
 };
 var CORE_CONFIG_KEYS = [
   'kantor_lat', 'kantor_lng', 'radius_meter', 'jam_masuk', 'batas_telat',
@@ -52,16 +58,34 @@ function parseConfig(pairs) {
   };
   ['jam_masuk', 'batas_telat'].forEach(function (k) {
     if (!/^\d{2}:\d{2}$/.test(raw[k])) throw new Error('Config ' + k + ' harus format HH:mm, sekarang: "' + raw[k] + '"');
+    if (Number(raw[k].slice(0, 2)) > 23 || Number(raw[k].slice(3, 5)) > 59) {
+      throw new Error('Config ' + k + ' tidak valid: "' + raw[k] + '"');
+    }
   });
+  var positive = function (k) {
+    var n = num(k);
+    if (!(n > 0)) throw new Error('Config ' + k + ' harus > 0, sekarang: "' + raw[k] + '"');
+    return n;
+  };
+  var inRange = function (k, min, max) {
+    var n = num(k);
+    if (n < min || n > max) throw new Error('Config ' + k + ' harus antara ' + min + ' dan ' + max + ', sekarang: "' + raw[k] + '"');
+    return n;
+  };
+  var nonNegInt = function (k) {
+    var n = num(k);
+    if (n < 0 || Math.floor(n) !== n) throw new Error('Config ' + k + ' harus bilangan bulat >= 0, sekarang: "' + raw[k] + '"');
+    return n;
+  };
 
   return {
-    kantorLat: num('kantor_lat'),
-    kantorLng: num('kantor_lng'),
-    radiusMeter: num('radius_meter'),
+    kantorLat: inRange('kantor_lat', -90, 90),
+    kantorLng: inRange('kantor_lng', -180, 180),
+    radiusMeter: positive('radius_meter'),
     jamMasuk: raw.jam_masuk,
     batasTelat: raw.batas_telat,
-    batasEditLogbookHari: num('batas_edit_logbook_hari'),
-    maxAkurasiMeter: num('max_akurasi_meter'),
+    batasEditLogbookHari: nonNegInt('batas_edit_logbook_hari'),
+    maxAkurasiMeter: positive('max_akurasi_meter'),
     folderId: raw.folder_id,
     googleClientId: raw.google_client_id
   };
@@ -75,7 +99,9 @@ function checkTokenClaims(info, clientId, nowSec) {
   if (String(info.email_verified) !== 'true') return fail_('Email Google belum terverifikasi.');
   var exp = Number(info.exp);
   if (!isFinite(exp) || exp <= nowSec) return fail_('Sesi login kedaluwarsa. Silakan login ulang.');
-  return { ok: true, email: String(info.email).toLowerCase().trim(), name: info.name || '', exp: exp };
+  var email = String(info.email == null ? '' : info.email).toLowerCase().trim();
+  if (!email) return fail_('Token tidak berisi email.');
+  return { ok: true, email: email, name: info.name || '', exp: exp };
 }
 
 function isValidDate(s) {
@@ -110,14 +136,22 @@ function resolveRole(email, admins, pesertaList, today) {
 /* ---------- Waktu, teks & upload ---------- */
 
 function toSeconds(hms) {
-  var m = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(hms));
-  if (!m) throw new Error('Format jam tidak valid: ' + hms);
+  var m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(String(hms));
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59 || Number(m[3] || 0) > 59) {
+    throw new Error('Format jam tidak valid: ' + hms);
+  }
   return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] || 0);
 }
 
 function isLate(jamMasuk, batasTelat) {
   if (!jamMasuk) return false;
-  return toSeconds(jamMasuk) > toSeconds(batasTelat);
+  var masuk;
+  try {
+    masuk = toSeconds(jamMasuk);
+  } catch (e) {
+    return false; // data sheet berantakan (mis. "1899-12-30") bukan alasan crash
+  }
+  return masuk > toSeconds(batasTelat);
 }
 
 function sanitizeText(s, maxLen) {
@@ -140,8 +174,12 @@ function validateUpload(file, kind) {
   if (!rule) return fail_('Jenis upload tidak dikenal.');
   if (!file || !stripDataUrl(file.base64)) return fail_('File belum dipilih.');
   if (rule.mimes.indexOf(file.mime) < 0) return fail_('Format file tidak didukung (' + file.mime + ').');
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(stripDataUrl(file.base64))) return fail_('Isi file rusak.');
+  var b64 = stripDataUrl(file.base64);
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || b64.length % 4 !== 0) return fail_('Isi file rusak.');
+  var magic = CORE_MAGIC_PREFIX[file.mime];
+  if (!magic || b64.indexOf(magic) !== 0) return fail_('Isi file tidak sesuai format ' + file.mime + '.');
   var bytes = base64Bytes(file.base64);
+  if (bytes < rule.minBytes) return fail_('File terlalu kecil atau rusak.');
   if (bytes > rule.maxBytes) return fail_('Ukuran file maksimal ' + (rule.maxBytes / 1024 / 1024) + ' MB.');
   return { ok: true, bytes: bytes };
 }
@@ -151,6 +189,9 @@ function validateUpload(file, kind) {
 function checkLocation_(input, mode, config) {
   if (!isFiniteNum_(input.lat) || !isFiniteNum_(input.lng) || !isFiniteNum_(input.accuracy)) {
     return fail_('Lokasi GPS tidak terbaca. Aktifkan GPS lalu coba lagi.');
+  }
+  if (Math.abs(input.lat) > 90 || Math.abs(input.lng) > 180 || input.accuracy < 0) {
+    return fail_('Lokasi GPS tidak valid.');
   }
   var distance = Math.round(haversineMeters(input.lat, input.lng, config.kantorLat, config.kantorLng));
   var flags = [];
@@ -179,7 +220,8 @@ function validateCheckOut(input, existing, config) {
   if (existing.status !== 'Masuk') return fail_('Hari ini kamu tercatat ' + existing.status + ', tidak perlu absen pulang.');
   if (existing.jam_pulang) return fail_('Kamu sudah absen pulang hari ini.');
   if (!input.hasSelfie) return fail_('Selfie wajib untuk absen pulang.');
-  return checkLocation_(input, existing.mode, config);
+  // Default-deny: radius berlaku kecuali mode tercatat persis WFH (mode kosong/rusak dianggap WFO).
+  return checkLocation_(input, existing.mode === 'WFH' ? 'WFH' : 'WFO', config);
 }
 
 /* ---------- Logbook & peserta ---------- */
@@ -245,6 +287,13 @@ function workdaysInRange(start, end) {
 
 function buildRekap(pesertaList, absensiRows, bulan, today, batasTelat) {
   var b = monthBounds(bulan);
+  // Kelompokkan baris absensi per email (huruf kecil) sekali saja, bukan filter per peserta.
+  var byEmail = {};
+  absensiRows.forEach(function (row) {
+    var key = String(row.email == null ? '' : row.email).toLowerCase().trim();
+    if (!byEmail[key]) byEmail[key] = [];
+    byEmail[key].push(row);
+  });
   return pesertaList
     .filter(function (p) {
       return (!p.tanggal_mulai || p.tanggal_mulai <= b.last) && (!p.tanggal_selesai || p.tanggal_selesai >= b.first);
@@ -254,13 +303,14 @@ function buildRekap(pesertaList, absensiRows, bulan, today, batasTelat) {
       var start = [b.first, p.tanggal_mulai || b.first].sort()[1];
       var end = [b.last, p.tanggal_selesai || b.last, today].sort()[0];
       var hariKerja = workdaysInRange(start, end);
-      var rows = absensiRows.filter(function (r) {
-        return String(r.email).toLowerCase().trim() === email && r.tanggal >= b.first && r.tanggal <= b.last;
-      });
       var tercatat = {};
       var r = { email: email, nama: p.nama, instansi: p.instansi || '', hariKerja: hariKerja.length,
         hadir: 0, wfo: 0, wfh: 0, izin: 0, sakit: 0, telat: 0, tanpaKeterangan: 0 };
-      rows.forEach(function (row) {
+      (byEmail[email] || []).forEach(function (row) {
+        // Hanya baris dalam rentang efektif (bulan ∩ periode magang ∩ ≤ hari ini).
+        // Baris di akhir pekan tetap dihitung (hadir boleh kerja di akhir pekan), hanya tidak menambah hariKerja.
+        if (row.tanggal < start || row.tanggal > end) return;
+        if (tercatat[row.tanggal]) return; // satu tanggal dihitung sekali; baris pertama menang
         tercatat[row.tanggal] = true;
         if (row.status === 'Masuk') {
           r.hadir++;
@@ -273,7 +323,8 @@ function buildRekap(pesertaList, absensiRows, bulan, today, batasTelat) {
           r.sakit++;
         }
       });
-      r.tanpaKeterangan = hariKerja.filter(function (d) { return !tercatat[d]; }).length;
+      // Hari ini belum dianggap alpa (peserta masih bisa absen), jadi tidak dihitung.
+      r.tanpaKeterangan = hariKerja.filter(function (d) { return d !== today && !tercatat[d]; }).length;
       return r;
     });
 }

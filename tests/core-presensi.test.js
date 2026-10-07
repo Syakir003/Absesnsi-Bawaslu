@@ -55,3 +55,31 @@ test('checkOut: belum masuk / izin / sudah pulang / tanpa selfie', () => {
   assert.match(core.validateCheckOut({ hasSelfie: true, ...diKantor }, { status: 'Masuk', mode: 'WFO', jam_pulang: '16:00:00' }, config).error, /sudah absen pulang/);
   assert.match(core.validateCheckOut({ hasSelfie: false, ...diKantor }, { status: 'Masuk', mode: 'WFO', jam_pulang: '' }, config).error, /Selfie wajib/);
 });
+
+test('checkIn: koordinat / akurasi di luar rentang → Lokasi GPS tidak valid', () => {
+  const base = { status: 'Masuk', mode: 'WFH', hasSelfie: true, ...diKantor };
+  const msg = { ok: false, error: 'Lokasi GPS tidak valid.' };
+  assert.deepEqual(core.validateCheckIn({ ...base, lat: 91 }, null, config), msg);
+  assert.deepEqual(core.validateCheckIn({ ...base, lat: -90.01 }, null, config), msg);
+  assert.deepEqual(core.validateCheckIn({ ...base, lng: 181 }, null, config), msg);
+  assert.deepEqual(core.validateCheckIn({ ...base, lng: -180.01 }, null, config), msg);
+  assert.deepEqual(core.validateCheckIn({ ...base, accuracy: -1 }, null, config), msg);
+  // batas tepat masih valid
+  assert.equal(core.validateCheckIn({ ...base, lat: 90, lng: 180, accuracy: 0 }, null, config).ok, true);
+});
+
+test('checkOut: koordinat tidak valid ditolak', () => {
+  const existing = { status: 'Masuk', mode: 'WFH', jam_pulang: '' };
+  assert.deepEqual(core.validateCheckOut({ hasSelfie: true, ...diKantor, lat: 200 }, existing, config), { ok: false, error: 'Lokasi GPS tidak valid.' });
+});
+
+test('checkOut: mode kosong/asing → radius tetap berlaku (default-deny), hanya WFH dibebaskan', () => {
+  const kosong = { status: 'Masuk', mode: '', jam_pulang: '' };
+  const r = core.validateCheckOut({ hasSelfie: true, ...jauh }, kosong, config);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /dari kantor \(maks 100 m\)/);
+  assert.equal(core.validateCheckOut({ hasSelfie: true, ...jauh }, { ...kosong, mode: undefined }, config).ok, false);
+  assert.equal(core.validateCheckOut({ hasSelfie: true, ...jauh }, { ...kosong, mode: 'wfh' }, config).ok, false);
+  assert.equal(core.validateCheckOut({ hasSelfie: true, ...diKantor }, kosong, config).ok, true);
+  assert.equal(core.validateCheckOut({ hasSelfie: true, ...jauh }, { ...kosong, mode: 'WFH' }, config).ok, true);
+});

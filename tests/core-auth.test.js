@@ -61,3 +61,27 @@ test('resolveRole: peserta nonaktif & email asing ditolak', () => {
   assert.match(core.resolveRole('dodi@gmail.com', admins, peserta, '2026-10-07').error, /tidak aktif/);
   assert.match(core.resolveRole('x@gmail.com', admins, peserta, '2026-10-07').error, /belum terdaftar/);
 });
+
+test('checkTokenClaims: email kosong / hilang ditolak', () => {
+  const msg = { ok: false, error: 'Token tidak berisi email.' };
+  assert.deepEqual(core.checkTokenClaims({ ...goodInfo, email: undefined }, CID, NOW), msg);
+  assert.deepEqual(core.checkTokenClaims({ ...goodInfo, email: '' }, CID, NOW), msg);
+  assert.deepEqual(core.checkTokenClaims({ ...goodInfo, email: '   ' }, CID, NOW), msg);
+  assert.deepEqual(core.checkTokenClaims({ ...goodInfo, email: null }, CID, NOW), msg);
+});
+
+test('checkTokenClaims: exp tepat sama dengan nowSec ditolak', () => {
+  const r = core.checkTokenClaims({ ...goodInfo, exp: String(NOW) }, CID, NOW);
+  assert.deepEqual(r, { ok: false, error: 'Sesi login kedaluwarsa. Silakan login ulang.' });
+  assert.equal(core.checkTokenClaims({ ...goodInfo, exp: String(NOW + 1) }, CID, NOW).ok, true);
+});
+
+test('checkTokenClaims: iss tanpa https (accounts.google.com) diterima', () => {
+  const r = core.checkTokenClaims({ ...goodInfo, iss: 'accounts.google.com' }, CID, NOW);
+  assert.equal(r.ok, true);
+  assert.equal(r.email, 'budi@gmail.com');
+});
+
+test('checkTokenClaims: info null ditolak', () => {
+  assert.equal(core.checkTokenClaims(null, CID, NOW).ok, false);
+});
