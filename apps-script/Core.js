@@ -66,3 +66,43 @@ function parseConfig(pairs) {
     googleClientId: raw.google_client_id
   };
 }
+
+/* ---------- Auth & role ---------- */
+
+function checkTokenClaims(info, clientId, nowSec) {
+  if (!info || info.aud !== clientId) return fail_('Token bukan untuk aplikasi ini.');
+  if (info.iss !== 'accounts.google.com' && info.iss !== 'https://accounts.google.com') return fail_('Penerbit token tidak valid.');
+  if (String(info.email_verified) !== 'true') return fail_('Email Google belum terverifikasi.');
+  var exp = Number(info.exp);
+  if (!isFinite(exp) || exp <= nowSec) return fail_('Sesi login kedaluwarsa. Silakan login ulang.');
+  return { ok: true, email: String(info.email).toLowerCase().trim(), name: info.name || '', exp: exp };
+}
+
+function isValidDate(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s))) return false;
+  var p = String(s).split('-').map(Number);
+  var d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  return d.getUTCFullYear() === p[0] && d.getUTCMonth() === p[1] - 1 && d.getUTCDate() === p[2];
+}
+
+function isValidMonth(s) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(s));
+}
+
+function isPesertaActive(p, today) {
+  if (!p || String(p.aktif).toUpperCase() !== 'Y') return false;
+  if (p.tanggal_mulai && today < p.tanggal_mulai) return false;
+  if (p.tanggal_selesai && today > p.tanggal_selesai) return false;
+  return true;
+}
+
+function resolveRole(email, admins, pesertaList, today) {
+  var e = String(email).toLowerCase().trim();
+  var same = function (row) { return String(row.email).toLowerCase().trim() === e; };
+  var admin = admins.filter(same)[0];
+  if (admin) return { ok: true, role: 'admin', email: e, nama: admin.nama || e };
+  var p = pesertaList.filter(same)[0];
+  if (!p) return fail_('Email ' + e + ' belum terdaftar. Hubungi admin.');
+  if (!isPesertaActive(p, today)) return fail_('Akun kamu tidak aktif atau di luar periode magang.');
+  return { ok: true, role: 'peserta', email: e, nama: p.nama || e, instansi: p.instansi || '' };
+}
