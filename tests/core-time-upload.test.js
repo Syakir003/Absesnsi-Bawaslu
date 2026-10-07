@@ -125,3 +125,17 @@ test('validateUpload: tepat maxBytes diterima, maxBytes+1 ditolak', () => {
   assert.deepEqual(core.validateUpload({ mime: 'image/png', base64: png(suratMax) }, 'lampiran'), { ok: true, bytes: suratMax });
   assert.match(core.validateUpload({ mime: 'image/png', base64: png(suratMax + 1) }, 'lampiran').error, /maksimal 2 MB/);
 });
+
+test('sheetSafeValue: awalan rumus diberi apostrof, angka negatif & teks biasa tetap', () => {
+  assert.equal(core.sheetSafeValue('=SUM(A1)'), "'=SUM(A1)");
+  assert.equal(core.sheetSafeValue('+62'), "'+62");
+  assert.equal(core.sheetSafeValue('@x'), "'@x");
+  assert.equal(core.sheetSafeValue('-cmd'), "'-cmd");
+  assert.equal(core.sheetSafeValue('-7.9666'), '-7.9666');
+  assert.equal(core.sheetSafeValue('-.5'), '-.5');
+  assert.equal(core.sheetSafeValue('biasa'), 'biasa');
+  assert.equal(core.sheetSafeValue(''), '');
+  assert.equal(core.sheetSafeValue(5), '5');
+  assert.equal(core.sheetSafeValue(null), '');
+  assert.equal(core.sheetSafeValue(undefined), '');
+});

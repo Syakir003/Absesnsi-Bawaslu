@@ -158,6 +158,12 @@ function sanitizeText(s, maxLen) {
   return String(s == null ? '' : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, maxLen);
 }
 
+/** Cegah formula injection di Sheets: awalan = + @ (atau - diikuti bukan angka/titik) diberi apostrof. */
+function sheetSafeValue(v) {
+  var s = v === null || v === undefined ? '' : String(v);
+  return (/^[=+@]/.test(s) || /^-[^\d.]/.test(s)) ? "'" + s : s;
+}
+
 function stripDataUrl(b64) {
   return String(b64 || '').replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
 }
