@@ -1,14 +1,20 @@
-// CSV aman: escape kutip/koma/newline + cegah formula injection (=, +, @, -teks).
-export function csvCell(value) {
+// CSV aman: escape kutip/pemisah/newline + cegah formula injection.
+// Awalan = + - @ TAB CR diberi apostrof, kecuali seluruh sel adalah angka polos (mis. -7.9666).
+const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+
+export function csvCell(value, delimiter = ';') {
   let s = value === null || value === undefined ? '' : String(value);
-  if (/^[=+@\t\r]/.test(s) || /^-[^\d.]/.test(s)) s = `'${s}`;
-  return /[",\r\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (/^[=+\-@\t\r]/.test(s) && !PLAIN_NUMBER.test(s)) s = `'${s}`;
+  const needsQuote = /[",;\r\n]/.test(s) || (delimiter && s.includes(delimiter));
+  return needsQuote ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-/** columns: [{ label, key }] */
-export function toCsv(rows, columns) {
-  const head = columns.map((c) => csvCell(c.label)).join(',');
-  const body = rows.map((r) => columns.map((c) => csvCell(r[c.key])).join(','));
+/**
+ * columns: [{ label, key }]. Default pemisah ';' supaya terbuka rapi di Excel berbahasa Indonesia.
+ */
+export function toCsv(rows, columns, delimiter = ';') {
+  const head = columns.map((c) => csvCell(c.label, delimiter)).join(delimiter);
+  const body = rows.map((r) => columns.map((c) => csvCell(r[c.key], delimiter)).join(delimiter));
   return [head, ...body].join('\r\n');
 }
 

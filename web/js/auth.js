@@ -1,7 +1,9 @@
 import { CONFIG } from '../config.js';
 
 const KEY = 'presensi_id_token';
+const SKEW_KEY = 'presensi_id_token_skew';
 let memToken = null;
+let memSkew = 0;
 
 export function decodeJwt(token) {
   const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -10,28 +12,54 @@ export function decodeJwt(token) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
+/**
+ * Apakah token masih berlaku ≥ 1 menit menurut jam perangkat?
+ * skewSec = iat(server) − jam perangkat saat token diterima; exp dikonversi ke jam perangkat dengan `exp − skew`.
+ */
+export function isTokenFresh(payload, skewSec, nowMs) {
+  if (!payload || typeof payload.exp !== 'number') return false;
+  return (payload.exp - (skewSec || 0)) * 1000 >= nowMs + 60_000;
+}
+
 function store(token) {
   memToken = token;
+  memSkew = 0;
+  if (token) {
+    try {
+      const { iat } = decodeJwt(token);
+      if (typeof iat === 'number') memSkew = iat - Math.floor(Date.now() / 1000);
+    } catch { /* token rusak: getToken akan membuangnya */ }
+  }
   try {
-    if (token) sessionStorage.setItem(KEY, token);
-    else sessionStorage.removeItem(KEY);
+    if (token) {
+      sessionStorage.setItem(KEY, token);
+      sessionStorage.setItem(SKEW_KEY, String(memSkew));
+    } else {
+      sessionStorage.removeItem(KEY);
+      sessionStorage.removeItem(SKEW_KEY);
+    }
   } catch { /* storage diblokir: cukup simpan di memori */ }
 }
 
-/** Token yang masih berlaku ≥ 1 menit, atau null. */
+/** Token yang masih berlaku ≥ 1 menit (dikoreksi selisih jam perangkat), atau null. */
 export function getToken() {
   let token = memToken;
+  let skew = memSkew;
   if (!token) {
-    try { token = sessionStorage.getItem(KEY); } catch { token = null; }
+    try {
+      token = sessionStorage.getItem(KEY);
+      skew = Number(sessionStorage.getItem(SKEW_KEY)) || 0;
+    } catch { token = null; }
   }
   if (!token) return null;
   try {
-    if (decodeJwt(token).exp * 1000 < Date.now() + 60_000) { store(null); return null; }
+    if (!isTokenFresh(decodeJwt(token), skew, Date.now())) { store(null); return null; }
   } catch {
     store(null);
     return null;
   }
   memToken = token;
+  memSkew = skew;
   return token;
 }
 
@@ -50,13 +78,21 @@ export function waitForGsi(timeoutMs = 10_000) {
   });
 }
 
+let gsiInitialized = false;
+let loginHandler = null;
+
+/** initialize() hanya sekali; pemanggilan berikutnya hanya mengganti callback dan menggambar ulang tombol. */
 export function renderLogin(container, onLogin) {
-  google.accounts.id.initialize({
-    client_id: CONFIG.GOOGLE_CLIENT_ID,
-    callback: (resp) => { store(resp.credential); onLogin(); },
-    auto_select: true,
-    cancel_on_tap_outside: false,
-  });
+  loginHandler = onLogin;
+  if (!gsiInitialized) {
+    google.accounts.id.initialize({
+      client_id: CONFIG.GOOGLE_CLIENT_ID,
+      callback: (resp) => { store(resp.credential); loginHandler?.(); },
+      auto_select: true,
+      cancel_on_tap_outside: false,
+    });
+    gsiInitialized = true;
+  }
   google.accounts.id.renderButton(container, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with' });
   google.accounts.id.prompt();
 }

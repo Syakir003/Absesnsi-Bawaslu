@@ -128,11 +128,16 @@ test('validateUpload: tepat maxBytes diterima, maxBytes+1 ditolak', () => {
 
 test('sheetSafeValue: awalan rumus diberi apostrof, angka negatif & teks biasa tetap', () => {
   assert.equal(core.sheetSafeValue('=SUM(A1)'), "'=SUM(A1)");
-  assert.equal(core.sheetSafeValue('+62'), "'+62");
+  assert.equal(core.sheetSafeValue('+62'), '+62'); // angka polos
+  assert.equal(core.sheetSafeValue('+62 812'), "'+62 812");
   assert.equal(core.sheetSafeValue('@x'), "'@x");
   assert.equal(core.sheetSafeValue('-cmd'), "'-cmd");
   assert.equal(core.sheetSafeValue('-7.9666'), '-7.9666');
-  assert.equal(core.sheetSafeValue('-.5'), '-.5');
+  assert.equal(core.sheetSafeValue('-.5'), "'-.5");
+  assert.equal(core.sheetSafeValue('-1+HYPERLINK("x")'), "'-1+HYPERLINK(\"x\")");
+  assert.equal(core.sheetSafeValue('-2+3+cmd|x'), "'-2+3+cmd|x");
+  assert.equal(core.sheetSafeValue('\tcmd'), "'\tcmd");
+  assert.equal(core.sheetSafeValue('\rcmd'), "'\rcmd");
   assert.equal(core.sheetSafeValue('biasa'), 'biasa');
   assert.equal(core.sheetSafeValue(''), '');
   assert.equal(core.sheetSafeValue(5), '5');
@@ -145,6 +150,7 @@ test('stripSheetEscape: buang SATU apostrof awal hanya jika diikuti = + @ -', ()
   assert.equal(core.stripSheetEscape("'+62"), '+62');
   assert.equal(core.stripSheetEscape("'@x"), '@x');
   assert.equal(core.stripSheetEscape("'-cmd"), '-cmd');
+  assert.equal(core.stripSheetEscape("'\tcmd"), '\tcmd');
   assert.equal(core.stripSheetEscape("''=x"), "''=x");
   assert.equal(core.stripSheetEscape("'biasa"), "'biasa");
   assert.equal(core.stripSheetEscape("'"), "'");

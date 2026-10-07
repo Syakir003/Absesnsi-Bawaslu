@@ -3,8 +3,11 @@ export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v === null || v === undefined || v === false) continue;
-    if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
-    else if (k === 'class') el.className = v;
+    if (k.startsWith('on')) {
+      if (typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+      continue; // jangan pernah jadikan inline handler (setAttribute)
+    }
+    if (k === 'class') el.className = v;
     else if (v === true) el.setAttribute(k, '');
     else el.setAttribute(k, String(v));
   }
@@ -19,28 +22,43 @@ export function clear(el) {
   el.replaceChildren();
 }
 
-let toastTimer = null;
+let toastTimers = [];
 export function toast(message, type = 'info') {
   const el = document.getElementById('toast');
+  const isError = type === 'error';
+  toastTimers.forEach(clearTimeout);
+  el.setAttribute('role', isError ? 'alert' : 'status');
+  el.setAttribute('aria-live', isError ? 'assertive' : 'polite');
   el.textContent = message;
-  el.className = `toast ${type}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.add('hidden'), type === 'error' ? 6000 : 3000);
+  el.className = `toast ${type} show`;
+  toastTimers = [setTimeout(() => {
+    el.classList.remove('show');
+    // kosongkan teks setelah fade-out supaya teks lama tidak tertinggal di DOM
+    toastTimers = [setTimeout(() => { el.textContent = ''; }, 400)];
+  }, isError ? 10_000 : 3000)];
 }
 
 export function setBusy(btn, busy, busyLabel = 'Memproses...') {
   if (busy) {
-    btn.dataset.label = btn.textContent;
+    if (btn.dataset.label === undefined) btn.dataset.label = btn.textContent; // jangan timpa label asli
     btn.textContent = busyLabel;
     btn.disabled = true;
   } else {
-    btn.textContent = btn.dataset.label || btn.textContent;
+    if (btn.dataset.label !== undefined) btn.textContent = btn.dataset.label;
+    delete btn.dataset.label;
     btn.disabled = false;
   }
 }
 
+// Hanya link ke Google Drive/Docs/Maps. Mengembalikan URL ter-normalisasi atau null.
+const ALLOWED_HOSTS = new Set(['drive.google.com', 'docs.google.com', 'www.google.com']);
 export function safeUrl(url) {
-  return /^https:\/\//.test(String(url || '')) ? url : null;
+  try {
+    const u = new URL(String(url ?? ''));
+    return u.protocol === 'https:' && ALLOWED_HOSTS.has(u.hostname) ? u.href : null;
+  } catch {
+    return null;
+  }
 }
 
 export function link(url, label) {
@@ -61,8 +79,8 @@ export function formatTanggal(dateStr) {
   return `${HARI[dow]}, ${String(d).padStart(2, '0')} ${BULAN[m - 1]} ${y}`;
 }
 
-export function segmented(options, initial, onChange) {
-  const wrap = h('div', { class: 'seg', role: 'radiogroup' });
+export function segmented(options, initial, onChange, label) {
+  const wrap = h('div', { class: 'seg', role: 'radiogroup', 'aria-label': label });
   options.forEach((opt) => {
     const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(opt === initial), class: opt === initial ? 'active' : '' }, opt);
     b.addEventListener('click', () => {
@@ -89,29 +107,46 @@ export function badge(status) {
   return h('span', { class: `badge ${status || 'Belum'}` }, status || 'Belum absen');
 }
 
-/** Tab sederhana. render(el) boleh mengembalikan fungsi cleanup (mis. matikan kamera). */
+/**
+ * Tab sederhana. render(el) boleh mengembalikan fungsi cleanup (mis. matikan kamera).
+ * Mengembalikan dispose(): menjalankan cleanup tab aktif (idempotent).
+ */
 export function tabs(container, defs) {
-  const nav = h('nav', { class: 'tabs' });
-  const body = h('div');
+  const nav = h('nav', { class: 'tabs', role: 'tablist' });
+  const body = h('div', { role: 'tabpanel' });
   let cleanup = null;
+  const dispose = () => {
+    const fn = cleanup;
+    cleanup = null;
+    if (typeof fn === 'function') fn();
+  };
   const show = (id) => {
-    if (typeof cleanup === 'function') cleanup();
-    nav.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
+    dispose();
+    nav.querySelectorAll('button').forEach((b) => {
+      const on = b.dataset.tab === id;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
     clear(body);
     cleanup = defs.find((d) => d.id === id).render(body);
   };
-  defs.forEach((d) => nav.append(h('button', { type: 'button', 'data-tab': d.id, onclick: () => show(d.id) }, d.label)));
+  defs.forEach((d) => nav.append(h('button', { type: 'button', role: 'tab', 'aria-selected': 'false', 'data-tab': d.id, onclick: () => show(d.id) }, d.label)));
   container.append(nav, body);
   show(defs[0].id);
+  return dispose;
 }
 
-/** Muat data async ke dalam `out` dengan state loading/error. */
+/** Muat data async ke dalam `out` dengan state loading/error. Respons lama diabaikan. */
 export async function loadInto(out, loader, renderRows) {
+  const id = String((Number(out.dataset.req) || 0) + 1);
+  out.dataset.req = id;
   out.replaceChildren(h('p', { class: 'muted' }, 'Memuat...'));
   try {
     const data = await loader();
+    if (out.dataset.req !== id) return;
     out.replaceChildren(renderRows(data));
   } catch (e) {
+    if (out.dataset.req !== id) return;
     out.replaceChildren(h('p', { class: 'error' }, e.message));
   }
 }

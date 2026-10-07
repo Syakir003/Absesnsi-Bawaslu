@@ -1,6 +1,6 @@
 :root {
   --bg: #f4f6f9; --card: #ffffff; --text: #1d2433; --muted: #667085; --border: #e3e7ee;
-  --primary: #b3261e; --primary-text: #ffffff; --success: #1a7f37; --error: #c62828; --warn: #b26a00;
+  --primary: #b3261e; --primary-text: #ffffff; --success: #12652b; --error: #b3261e; --warn: #8a5300;
   --radius: 12px;
 }
 * { box-sizing: border-box; }
@@ -9,7 +9,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 syst
 h1 { font-size: 1.5rem; margin: .5rem 0; } h3 { font-size: 1rem; margin: 0 0 .5rem; }
 .topbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
 .tabs { display: flex; gap: 4px; overflow-x: auto; margin-bottom: 12px; }
-.tabs button { border: 0; background: transparent; padding: 8px 14px; border-radius: 999px; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tabs button { border: 0; background: transparent; min-height: 44px; padding: 8px 14px; border-radius: 999px; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .tabs button.active { background: var(--primary); color: var(--primary-text); }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
 .center { text-align: center; } .muted { color: var(--muted); } .small { font-size: .85rem; }
@@ -18,12 +18,13 @@ h1 { font-size: 1.5rem; margin: .5rem 0; } h3 { font-size: 1rem; margin: 0 0 .5r
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .btn { border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 10px 16px; border-radius: 10px; font: inherit; cursor: pointer; min-height: 44px; }
 .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
-.btn.ghost { background: transparent; } .btn.small { min-height: 32px; padding: 4px 10px; font-size: .85rem; }
+.btn.ghost { background: transparent; } .btn.small { min-height: 36px; padding: 4px 10px; font-size: .85rem; }
 .btn.block { width: 100%; } .btn:disabled { opacity: .5; cursor: not-allowed; }
 .seg { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .seg button { flex: 1; border: 0; background: var(--card); padding: 10px; font: inherit; cursor: pointer; min-height: 44px; }
 .seg button.active { background: var(--primary); color: var(--primary-text); }
-input, textarea, select { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.seg button:focus-visible { outline: 2px solid var(--text); outline-offset: -3px; }
+input, textarea, select { width: 100%; font: inherit; font-size: 16px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
 label { display: block; margin-bottom: 8px; }
 .cam { width: 100%; max-width: 360px; border-radius: 10px; background: #000; display: block; margin: 0 auto 8px; transform: scaleX(-1); }
 img.cam { transform: none; }
@@ -31,12 +32,16 @@ img.cam { transform: none; }
 table { width: 100%; border-collapse: collapse; background: var(--card); font-size: .9rem; }
 th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
 th { background: #f0f2f6; white-space: nowrap; }
-.badge { display: inline-block; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-size: .8rem; background: #eef1f6; }
+.badge { display: inline-block; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-size: .8rem; background: #eef1f6; color: #4b5565; }
 .badge.Masuk { background: #e6f4ea; color: var(--success); } .badge.Izin { background: #fff4e5; color: var(--warn); }
-.badge.Sakit { background: #fdecea; color: var(--error); } .badge.Belum { background: #eef1f6; color: var(--muted); }
-.toast { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 480px; margin: 0 auto; padding: 12px 16px; border-radius: 10px; background: #1d2433; color: #fff; z-index: 10; }
+.badge.Sakit { background: #fdecea; color: var(--error); } .badge.Belum { background: #eef1f6; color: #4b5565; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 480px; margin: 0 auto; padding: 12px 16px; border-radius: 10px; background: #1d2433; color: #fff; z-index: 10;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .2s, visibility .2s; }
+.toast.show { opacity: 1; visibility: visible; }
 .toast.error { background: var(--error); } .toast.success { background: var(--success); }
+@page { size: A4 landscape; margin: 12mm; }
 @media print {
   .topbar, .tabs, .no-print, .toast { display: none !important; }
+  .table-wrap { overflow: visible; }
   body { background: #fff; } .card { border: 0; padding: 0; }
 }

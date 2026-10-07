@@ -2,17 +2,26 @@ export async function openCamera(videoEl) {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('Browser tidak mendukung kamera. Pakai Chrome atau Safari versi terbaru.');
   }
+  let stream;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 } }, audio: false });
-    videoEl.muted = true;
-    videoEl.srcObject = stream;
-    await videoEl.play();
-    return stream;
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 } }, audio: false });
   } catch (e) {
     if (e.name === 'NotAllowedError') throw new Error('Izin kamera ditolak. Buka pengaturan browser → Izin situs → Kamera → Izinkan, lalu muat ulang.');
     if (e.name === 'NotFoundError') throw new Error('Kamera tidak ditemukan di perangkat ini.');
+    if (e.name === 'NotReadableError') throw new Error('Kamera sedang dipakai aplikasi lain. Tutup aplikasi itu lalu coba lagi.');
     throw new Error(`Kamera gagal dibuka: ${e.message}`);
   }
+  videoEl.muted = true;
+  videoEl.playsInline = true;
+  videoEl.setAttribute('playsinline', '');
+  videoEl.srcObject = stream;
+  try {
+    await videoEl.play();
+  } catch {
+    stopCamera(stream);
+    throw new Error('Kamera gagal diputar. Muat ulang halaman lalu coba lagi.');
+  }
+  return stream;
 }
 
 export function stopCamera(stream) {

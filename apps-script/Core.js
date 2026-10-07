@@ -158,16 +158,19 @@ function sanitizeText(s, maxLen) {
   return String(s == null ? '' : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, maxLen);
 }
 
-/** Cegah formula injection di Sheets: awalan = + @ (atau - diikuti bukan angka/titik) diberi apostrof. */
+/**
+ * Cegah formula injection di Sheets: string yang diawali = + - @ TAB CR diberi apostrof,
+ * KECUALI seluruh string adalah angka polos (mis. -7.9666), karena itu bukan rumus.
+ */
 function sheetSafeValue(v) {
   var s = v === null || v === undefined ? '' : String(v);
-  return (/^[=+@]/.test(s) || /^-[^\d.]/.test(s)) ? "'" + s : s;
+  return (/^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?$/.test(s)) ? "'" + s : s;
 }
 
-/** Kebalikan sheetSafeValue: buang SATU apostrof awal bila diikuti = + @ - (jaga-jaga apostrof tersimpan literal). */
+/** Kebalikan sheetSafeValue: buang SATU apostrof awal bila diikuti = + @ - TAB CR (jaga-jaga apostrof tersimpan literal). */
 function stripSheetEscape(s) {
   s = String(s);
-  return /^'[=+@-]/.test(s) ? s.slice(1) : s;
+  return /^'[=+@\-\t\r]/.test(s) ? s.slice(1) : s;
 }
 
 /** Ambil id file dari URL Drive (/d/<ID>... atau open?id=<ID>); '' bila bukan URL Drive. */

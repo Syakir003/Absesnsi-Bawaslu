@@ -26,13 +26,13 @@ Pakai akun Google milik kantor/admin (bukan akun pribadi peserta), karena semua 
 2. Di Sheet: **File → Settings → Time zone** pilih **(GMT+07:00) Jakarta**, supaya tanggal/jam di Sheet sama dengan jam server.
 3. Di Sheet: **Extensions → Apps Script**. Buat file dengan nama dan isi yang sama seperti di `apps-script/`: `Core`, `Errors`, `Repo`, `Setup`, `Auth`, `Files`, `Api`, `HandlersPeserta`, `HandlersAdmin`. Hapus `Code.gs` bawaan.
 4. **Project Settings → centang "Show appsscript.json"**, lalu ganti isinya dengan `apps-script/appsscript.json`.
-5. Pilih fungsi `setupSheets` lalu **Run**. Setujui izin akses. Sheet `Peserta`, `Absensi`, `Logbook`, `Config`, dan `Admin` akan terbentuk.
+5. Pilih fungsi `setupSheets` lalu **Run**. Setujui izin akses. Google akan menampilkan peringatan "Google hasn't verified this app": klik **Advanced → Go to ... (unsafe)**. Ini aman karena script-nya milik sendiri. Sheet `Peserta`, `Absensi`, `Logbook`, `Config`, dan `Admin` akan terbentuk.
 6. Buat folder di Google Drive, misalnya "Presensi - Bukti". Ambil ID-nya dari URL (`drive.google.com/drive/folders/<ID>`). **Share folder ini ke email admin (Viewer)** supaya admin bisa membuka selfie dan surat.
 7. Buat OAuth Client ID:
    1. Buka https://console.cloud.google.com/ lalu buat project baru.
-   2. Masuk ke **APIs & Services → OAuth consent screen**. Pilih External, isi nama aplikasi dan email. Scope cukup default (email, profile, openid). Lalu **Publish app**. Kalau masih mode Testing, hanya test user yang bisa login.
-   3. Masuk ke **Credentials → Create credentials → OAuth client ID → Web application**.
-   4. Isi **Authorized JavaScript origins** dengan `https://<username>.github.io` dan `http://localhost:5500`.
+   2. Masuk ke menu **Google Auth Platform** (dulu bernama **OAuth consent screen** di *APIs & Services*). Di **Branding** isi nama aplikasi dan email; di **Audience** pilih External. Scope cukup default (email, profile, openid). Lalu klik **Publish app** di **Audience**. Kalau masih mode Testing, hanya test user yang bisa login.
+   3. Masuk ke **Clients** (dulu **Credentials → Create credentials → OAuth client ID**) lalu buat client bertipe **Web application**.
+   4. Isi **Authorized JavaScript origins** dengan tiga origin ini: `https://<username>.github.io`, `http://localhost`, dan `http://localhost:5500`. Perubahan origin bisa butuh beberapa menit sampai berlaku.
    5. Salin Client ID-nya.
 8. Isi sheet `Config`:
    - `kantor_lat` dan `kantor_lng`: di Google Maps, klik kanan titik kantor, lalu klik koordinatnya untuk menyalin.
@@ -55,7 +55,7 @@ Pakai akun Google milik kantor/admin (bukan akun pribadi peserta), karena semua 
 ## Deploy frontend
 
 1. Isi `web/config.js` dengan `API_URL` (dari langkah 11) dan `GOOGLE_CLIENT_ID` (dari langkah 7).
-2. Push repo ke GitHub, lalu buka **Settings → Pages → Source: GitHub Actions**.
+2. Push repo ke GitHub (paket gratis GitHub Pages butuh repo **public**), lalu buka **Settings → Pages → Source: GitHub Actions**.
 3. Setiap push ke `main` akan menjalankan `npm test` lalu deploy folder `web/` ke `https://<username>.github.io/<repo>/`.
 
 Kedua nilai di `web/config.js` bukan rahasia: Client ID memang publik, dan API selalu memverifikasi token.
@@ -64,6 +64,7 @@ Kedua nilai di `web/config.js` bukan rahasia: Client ID memang publik, dan API s
 
 - Fake GPS tidak bisa dideteksi 100% tanpa server sendiri. Mitigasinya: selfie live (bukan dari galeri), jam dari server, dan flag `AKURASI_RENDAH`.
 - Kuota Apps Script cukup untuk puluhan peserta. Kalau sudah ratusan, pertimbangkan pindah ke backend sendiri.
+- Export: CSV memakai pemisah titik koma (;) untuk Excel berbahasa Indonesia; kalau kolom menyatu, buka lewat Data → From Text/CSV atau Google Sheets.
 - Hari kerja di rekap = Senin–Jumat. Hari libur nasional belum dikecualikan.
 - Satu email = satu baris di sheet `Peserta`. Untuk mengganti email peserta, nonaktifkan baris lama (aktif = N) lalu tambah peserta baru — jangan ada email dobel.
 - Edit data langsung di Sheet boleh, tapi jaga format teks: tanggal `yyyy-MM-dd`, jam `HH:mm:ss`.
