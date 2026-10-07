@@ -181,3 +181,40 @@ function validateCheckOut(input, existing, config) {
   if (!input.hasSelfie) return fail_('Selfie wajib untuk absen pulang.');
   return checkLocation_(input, existing.mode, config);
 }
+
+/* ---------- Logbook & peserta ---------- */
+
+function daysBetween(from, to) {
+  var a = from.split('-').map(Number);
+  var b = to.split('-').map(Number);
+  return Math.round((Date.UTC(b[0], b[1] - 1, b[2]) - Date.UTC(a[0], a[1] - 1, a[2])) / 86400000);
+}
+
+function validateLogbook(input, today, batasHari) {
+  if (!isValidDate(input.tanggal)) return fail_('Tanggal logbook tidak valid.');
+  var age = daysBetween(input.tanggal, today);
+  if (age < 0) return fail_('Logbook tidak bisa diisi untuk tanggal yang akan datang.');
+  if (age > batasHari) return fail_('Logbook tanggal ' + input.tanggal + ' sudah lewat batas edit (' + batasHari + ' hari).');
+  var kegiatan = sanitizeText(input.kegiatan, 2000);
+  if (kegiatan.length < 5) return fail_('Uraian kegiatan minimal 5 karakter.');
+  return { ok: true, kegiatan: kegiatan };
+}
+
+function validatePeserta(input) {
+  var email = String(input.email || '').toLowerCase().trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail_('Email tidak valid.');
+  var nama = sanitizeText(input.nama, 100);
+  if (!nama) return fail_('Nama wajib diisi.');
+  var aktif = String(input.aktif || '').toUpperCase();
+  if (aktif !== 'Y' && aktif !== 'N') return fail_('Status aktif harus Y atau N.');
+  if (!isValidDate(input.tanggal_mulai)) return fail_('Tanggal mulai tidak valid.');
+  if (!isValidDate(input.tanggal_selesai)) return fail_('Tanggal selesai tidak valid.');
+  if (input.tanggal_selesai < input.tanggal_mulai) return fail_('Tanggal selesai harus setelah tanggal mulai.');
+  return {
+    ok: true,
+    peserta: {
+      email: email, nama: nama, instansi: sanitizeText(input.instansi, 150), aktif: aktif,
+      tanggal_mulai: input.tanggal_mulai, tanggal_selesai: input.tanggal_selesai
+    }
+  };
+}
