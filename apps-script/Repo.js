@@ -20,8 +20,11 @@ function sheet_(def) {
 }
 
 function normalizeCell_(v) {
-  if (Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
-  return v === null || v === undefined ? '' : String(v).trim();
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    // Sheets mengirim sel waktu-saja sebagai Date tahun 1899 (epoch Sheets), bukan tanggal.
+    return Utilities.formatDate(v, TZ, v.getFullYear() < 1900 ? 'HH:mm:ss' : 'yyyy-MM-dd');
+  }
+  return v === null || v === undefined ? '' : stripSheetEscape(String(v).trim());
 }
 
 /** Semua baris sebagai object {header: value, _row: nomorBarisSheet}. */
@@ -48,12 +51,23 @@ function toRow_(def, obj) {
   });
 }
 
+/** Tulis baris baru dengan format teks eksplisit (tidak bergantung pada format awal 1000 baris). */
 function insert_(def, obj) {
-  sheet_(def).appendRow(toRow_(def, obj));
+  var sh = sheet_(def);
+  var row = sh.getLastRow() + 1;
+  if (row > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 100);
+  sh.getRange(row, 1, 1, def.headers.length).setNumberFormat('@').setValues([toRow_(def, obj)]);
 }
 
 function update_(def, rowNumber, obj) {
-  sheet_(def).getRange(rowNumber, 1, 1, def.headers.length).setValues([toRow_(def, obj)]);
+  sheet_(def).getRange(rowNumber, 1, 1, def.headers.length).setNumberFormat('@').setValues([toRow_(def, obj)]);
+}
+
+/** Bentuk respons satu baris: semua header, nilai string seperti saat dibaca ulang, tanpa _row. */
+function rowOut_(def, obj) {
+  var out = {};
+  def.headers.forEach(function (h) { out[h] = normalizeCell_(obj[h]); });
+  return out;
 }
 
 function readConfig_() {
@@ -76,7 +90,9 @@ function withLock_(fn) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) throw userError_('Server sedang sibuk, coba lagi sebentar.');
   try {
-    return fn();
+    var result = fn();
+    SpreadsheetApp.flush(); // Sheets mem-buffer tulisan; paksa tersimpan sebelum lock dilepas
+    return result;
   } finally {
     lock.releaseLock();
   }

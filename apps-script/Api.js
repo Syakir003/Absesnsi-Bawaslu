@@ -36,7 +36,8 @@ function handlers_() {
 }
 
 function route_(req) {
-  var handler = handlers_()[req.action];
+  var handlers = handlers_();
+  var handler = Object.prototype.hasOwnProperty.call(handlers, req.action) ? handlers[req.action] : null;
   if (!handler) throw userError_('Aksi tidak dikenal: ' + req.action);
   var config = readConfig_();
   var claims = verifyIdToken_(req.idToken, config.googleClientId);
@@ -52,5 +53,6 @@ function requireMonth_(bulan) {
 }
 
 function num_(v) {
-  return v === null || v === undefined || v === '' ? NaN : Number(v);
+  if (typeof v === 'number') return v;
+  return typeof v === 'string' && /^\s*-?\d+(\.\d+)?\s*$/.test(v) ? Number(v) : NaN;
 }

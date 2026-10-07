@@ -1,4 +1,14 @@
 /** HandlersPeserta.js — me, absen masuk/pulang, riwayat, logbook. */
+/** Jalankan fn setelah upload; kalau apa pun gagal, file yang sudah diupload dibuang lalu error dilempar ulang. */
+function afterUpload_(file, fn) {
+  try {
+    return fn();
+  } catch (e) {
+    if (file) trashFile_(file.id);
+    throw e;
+  }
+}
+
 function handleMe_(ctx) {
   var c = ctx.config;
   var out = {
@@ -28,9 +38,9 @@ function handleCheckIn_(ctx) {
     ? saveUpload_(d.selfie, 'selfie', c.folderId, base + '_masuk')
     : saveUpload_(d.surat, 'surat', c.folderId, base + '_' + input.status.toLowerCase());
 
-  return withLock_(function () {
+  return afterUpload_(file, function () { return withLock_(function () {
     var recheck = validateCheckIn(input, findAbsensi_(u.email, now.tanggal), c);
-    if (!recheck.ok) { trashFile_(file.id); throw userError_(recheck.error); }
+    if (!recheck.ok) throw userError_(recheck.error);
     var row = { id: Utilities.getUuid(), email: u.email, tanggal: now.tanggal, status: input.status, catatan: sanitizeText(d.catatan, 500) };
     if (input.status === 'Masuk') {
       row.jam_masuk = now.jam;
@@ -43,8 +53,8 @@ function handleCheckIn_(ctx) {
       row.link_surat = file.url;
     }
     insert_(SHEETS.ABSENSI, row);
-    return row;
-  });
+    return rowOut_(SHEETS.ABSENSI, row);
+  }); });
 }
 
 function handleCheckOut_(ctx) {
@@ -55,10 +65,10 @@ function handleCheckOut_(ctx) {
 
   var file = saveUpload_(d.selfie, 'selfie', c.folderId, now.tanggal + '_' + u.email + '_pulang');
 
-  return withLock_(function () {
+  return afterUpload_(file, function () { return withLock_(function () {
     var existing = findAbsensi_(u.email, now.tanggal);
     var recheck = validateCheckOut(input, existing, c);
-    if (!recheck.ok) { trashFile_(file.id); throw userError_(recheck.error); }
+    if (!recheck.ok) throw userError_(recheck.error);
     existing.jam_pulang = now.jam;
     existing.lat_pulang = input.lat; existing.lng_pulang = input.lng;
     existing.akurasi_pulang = Math.round(input.accuracy); existing.jarak_pulang = recheck.distance;
@@ -67,8 +77,8 @@ function handleCheckOut_(ctx) {
     existing.flags = flags.join(',');
     existing.link_selfie_pulang = file.url;
     update_(SHEETS.ABSENSI, existing._row, existing);
-    return stripRow_(existing);
-  });
+    return rowOut_(SHEETS.ABSENSI, existing);
+  }); });
 }
 
 function handleRiwayat_(ctx) {
@@ -103,18 +113,23 @@ function handleLogbookSave_(ctx) {
     file = saveUpload_(d.lampiran, 'lampiran', c.folderId, d.tanggal + '_' + u.email + '_logbook');
   }
 
-  return withLock_(function () {
+  var oldUrl = '';
+  var saved = afterUpload_(file, function () { return withLock_(function () {
     var existing = readAll_(SHEETS.LOGBOOK).filter(function (r) { return r.email === u.email && r.tanggal === d.tanggal; })[0];
     if (existing) {
       existing.kegiatan = v.kegiatan;
-      if (file) existing.link_lampiran = file.url;
+      if (file) { oldUrl = existing.link_lampiran; existing.link_lampiran = file.url; }
       existing.diubah = now.iso;
       update_(SHEETS.LOGBOOK, existing._row, existing);
-      return stripRow_(existing);
+      return rowOut_(SHEETS.LOGBOOK, existing);
     }
     var row = { id: Utilities.getUuid(), email: u.email, tanggal: d.tanggal, kegiatan: v.kegiatan,
       link_lampiran: file ? file.url : '', dibuat: now.iso, diubah: now.iso };
     insert_(SHEETS.LOGBOOK, row);
-    return row;
-  });
+    return rowOut_(SHEETS.LOGBOOK, row);
+  }); });
+  // Update sukses dengan lampiran baru: buang lampiran lama (di luar lock; error diabaikan trashFile_).
+  var oldId = driveFileIdFromUrl(oldUrl);
+  if (oldId) trashFile_(oldId);
+  return saved;
 }

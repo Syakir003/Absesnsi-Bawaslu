@@ -164,6 +164,20 @@ function sheetSafeValue(v) {
   return (/^[=+@]/.test(s) || /^-[^\d.]/.test(s)) ? "'" + s : s;
 }
 
+/** Kebalikan sheetSafeValue: buang SATU apostrof awal bila diikuti = + @ - (jaga-jaga apostrof tersimpan literal). */
+function stripSheetEscape(s) {
+  s = String(s);
+  return /^'[=+@-]/.test(s) ? s.slice(1) : s;
+}
+
+/** Ambil id file dari URL Drive (/d/<ID>... atau open?id=<ID>); '' bila bukan URL Drive. */
+function driveFileIdFromUrl(url) {
+  var s = String(url == null ? '' : url);
+  var m = /^https:\/\/(?:drive|docs)\.google\.com\/(?:[^?#]*\/)?d\/([A-Za-z0-9_-]+)/.exec(s) ||
+    /^https:\/\/drive\.google\.com\/open\?(?:[^#]*&)?id=([A-Za-z0-9_-]+)/.exec(s);
+  return m ? m[1] : '';
+}
+
 function stripDataUrl(b64) {
   return String(b64 || '').replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
 }

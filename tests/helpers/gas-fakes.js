@@ -9,6 +9,7 @@ const GAS_FILES = ['Core.js', 'Errors.js', 'Repo.js', 'Setup.js', 'Auth.js', 'Fi
 function fakeSheet(name) {
   const rows = [];
   const rawWrites = []; // setiap baris mentah (sebelum apostrof dibuang) yang ditulis ke sheet
+  let maxRows = 1000; // ukuran awal sheet baru di Google Sheets
   // Meniru Sheets: apostrof di awal disembunyikan, sisanya disimpan sebagai teks.
   const stored = (r) => Array.from(r, (v) => { const s = String(v); return s.startsWith("'") ? s.slice(1) : s; });
   const sheet = {
@@ -17,9 +18,11 @@ function fakeSheet(name) {
     rawWrites,
     getDataRange: () => ({ getValues: () => (rows.length ? rows.map((r) => r.slice()) : [[]]) }),
     getRange: (a, col, numRows, numCols) => {
-      if (typeof a === 'string') return { setNumberFormat: () => ({}) };
-      return {
+      if (typeof a === 'string') return { setNumberFormat() { return this; } };
+      const range = {
+        setNumberFormat() { return range; },
         setValues(values) {
+          if (a + values.length - 1 > maxRows) throw new Error('Range di luar batas sheet (maxRows=' + maxRows + ')');
           values.forEach((v, i) => {
             rawWrites.push(Array.from(v, String));
             rows[a - 1 + i] = stored(v);
@@ -27,12 +30,15 @@ function fakeSheet(name) {
           return { setFontWeight: () => ({}) };
         },
       };
+      return range;
     },
     appendRow: (r) => {
       rawWrites.push(Array.from(r, String));
       rows.push(stored(r));
     },
     getLastRow: () => rows.length,
+    getMaxRows: () => maxRows,
+    insertRowsAfter: (after, howMany) => { if (after <= maxRows) maxRows += howMany; },
     setFrozenRows: () => {},
   };
   return sheet;
@@ -44,6 +50,7 @@ function createGas({ tokenInfo = {}, now = new Date('2026-10-07T00:15:00Z') } = 
   const cache = {};
   let fileSeq = 0;
   const fetchCalls = [];
+  let flushCalls = 0;
 
   const spreadsheet = {
     getSheetByName: (n) => sheets[n] || null,
@@ -55,7 +62,7 @@ function createGas({ tokenInfo = {}, now = new Date('2026-10-07T00:15:00Z') } = 
   const pad = (n) => String(n).padStart(2, '0');
   const ctx = {
     console,
-    SpreadsheetApp: { getActiveSpreadsheet: () => spreadsheet },
+    SpreadsheetApp: { getActiveSpreadsheet: () => spreadsheet, flush: () => { flushCalls++; } },
     Utilities: {
       formatDate(d, tz, fmt) {
         const j = new Date(d.getTime() + 7 * 3600 * 1000); // Asia/Jakarta = UTC+7
@@ -80,7 +87,16 @@ function createGas({ tokenInfo = {}, now = new Date('2026-10-07T00:15:00Z') } = 
       }),
       getFileById: (id) => ({ setTrashed: (t) => { files[id].trashed = t; } }),
     },
-    CacheService: { getScriptCache: () => ({ get: (k) => cache[k] ?? null, put: (k, v) => { cache[k] = v; } }) },
+    CacheService: {
+      getScriptCache: () => ({
+        get: (k) => cache[k] ?? null,
+        put: (k, v, ttl) => {
+          if (String(k).length > 250) throw new Error('CacheService: key > 250 karakter');
+          if (ttl !== undefined && ttl > 21600) throw new Error('CacheService: ttl > 21600 detik');
+          cache[k] = v;
+        },
+      }),
+    },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
     UrlFetchApp: {
       fetch(url) {
@@ -115,7 +131,7 @@ function createGas({ tokenInfo = {}, now = new Date('2026-10-07T00:15:00Z') } = 
     return rest.map((r) => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
   }
 
-  return { ctx, sheets, files, fetchCalls, call, rowsOf, setNow: (d) => { now = d; } };
+  return { ctx, sheets, files, fetchCalls, get flushCalls() { return flushCalls; }, call, rowsOf, setNow: (d) => { now = d; } };
 }
 
 module.exports = { createGas };

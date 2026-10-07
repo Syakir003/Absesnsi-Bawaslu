@@ -1,6 +1,10 @@
 /** Auth.js — verifikasi Google ID token & tentukan role. */
 function verifyIdToken_(idToken, clientId) {
   if (!idToken) throw authError_('Kamu belum login.');
+  // Pra-filter murah: harus string berbentuk JWT (3 bagian) dan tidak absurd panjangnya.
+  if (typeof idToken !== 'string' || idToken.length > 4096 || !/^[^.]+\.[^.]+\.[^.]+$/.test(idToken)) {
+    throw authError_('Sesi login tidak valid. Silakan login ulang.');
+  }
   var cache = CacheService.getScriptCache();
   var key = 'tok_' + Utilities.base64EncodeWebSafe(
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken));

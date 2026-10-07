@@ -139,3 +139,25 @@ test('sheetSafeValue: awalan rumus diberi apostrof, angka negatif & teks biasa t
   assert.equal(core.sheetSafeValue(null), '');
   assert.equal(core.sheetSafeValue(undefined), '');
 });
+
+test('stripSheetEscape: buang SATU apostrof awal hanya jika diikuti = + @ -', () => {
+  assert.equal(core.stripSheetEscape("'=SUM(A1)"), '=SUM(A1)');
+  assert.equal(core.stripSheetEscape("'+62"), '+62');
+  assert.equal(core.stripSheetEscape("'@x"), '@x');
+  assert.equal(core.stripSheetEscape("'-cmd"), '-cmd');
+  assert.equal(core.stripSheetEscape("''=x"), "''=x");
+  assert.equal(core.stripSheetEscape("'biasa"), "'biasa");
+  assert.equal(core.stripSheetEscape("'"), "'");
+  assert.equal(core.stripSheetEscape('biasa'), 'biasa');
+  assert.equal(core.stripSheetEscape(''), '');
+});
+
+test('driveFileIdFromUrl: ambil id dari URL Drive, selain itu string kosong', () => {
+  assert.equal(core.driveFileIdFromUrl('https://drive.google.com/file/d/1AbC_-xyz9'), '1AbC_-xyz9');
+  assert.equal(core.driveFileIdFromUrl('https://drive.google.com/file/d/1AbC_-xyz9/view?usp=drivesdk'), '1AbC_-xyz9');
+  assert.equal(core.driveFileIdFromUrl('https://drive.google.com/open?id=1AbC_-xyz9'), '1AbC_-xyz9');
+  assert.equal(core.driveFileIdFromUrl(''), '');
+  assert.equal(core.driveFileIdFromUrl(null), '');
+  assert.equal(core.driveFileIdFromUrl('https://example.com/file/d/abc'), '');
+  assert.equal(core.driveFileIdFromUrl('bukan url'), '');
+});

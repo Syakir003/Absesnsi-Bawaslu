@@ -12,10 +12,12 @@ function fileOfBytes(prefix, n) {
 }
 const SELFIE = { mime: 'image/jpeg', base64: fileOfBytes('/9j/', 2000) };
 const SURAT = { mime: 'application/pdf', base64: fileOfBytes('JVBERi0x', 500) };
+const LAMPIRAN = { mime: 'image/jpeg', base64: fileOfBytes('/9j/', 300) };
+const LAMPIRAN2 = { mime: 'image/png', base64: fileOfBytes('iVBORw0KGgo', 400) };
 const KANTOR = { lat: -7.9666, lng: 112.6326, accuracy: 10 };
 
 function setupGas() {
-  const gas = createGas({ tokenInfo: { 'tok-ani': info('ani@gmail.com'), 'tok-admin': info('admin@gmail.com'), 'tok-asing': info('asing@gmail.com') } });
+  const gas = createGas({ tokenInfo: { 'tok.ani.sig': info('ani@gmail.com'), 'tok.admin.sig': info('admin@gmail.com'), 'tok.asing.sig': info('asing@gmail.com') } });
   gas.ctx.setupSheets();
   const cfg = gas.sheets.Config;
   const set = (k, v) => { cfg.rows.find((r) => r[0] === k)[1] = v; };
@@ -28,4 +30,4 @@ function setupGas() {
   return gas;
 }
 
-module.exports = { CID, info, SELFIE, SURAT, KANTOR, setupGas };
+module.exports = { CID, info, SELFIE, SURAT, LAMPIRAN, LAMPIRAN2, KANTOR, fileOfBytes, setupGas };
