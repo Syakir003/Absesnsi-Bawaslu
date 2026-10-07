@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.js';
 import { getToken, clearSession } from './auth.js';
 
-const TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 const RETRY_DELAY_MS = 1000;
 
 export class ApiError extends Error {
@@ -15,16 +15,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Panggil Apps Script. Content-Type text/plain supaya tidak kena CORS preflight.
- * Timeout 60 dtk. Retry 1x (setelah jeda 1 dtk) hanya untuk error jaringan/timeout
+ * Timeout default 60 dtk (opsi timeoutMs, mis. untuk upload foto). Retry 1x (setelah jeda 1 dtk) hanya untuk error jaringan/timeout
  * (server menolak duplikat, jadi aman).
  */
-export async function api(action, data = {}, { retries = 1 } = {}) {
+export async function api(action, data = {}, { retries = 1, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const body = JSON.stringify({ action, idToken: getToken(), data });
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) await sleep(RETRY_DELAY_MS);
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const res = await fetch(CONFIG.API_URL, {
         method: 'POST',
