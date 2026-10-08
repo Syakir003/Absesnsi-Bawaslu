@@ -45,13 +45,19 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
   const retakeBtn = h('button', { class: 'btn ghost hidden', type: 'button' }, 'Ulangi Foto');
   const submitBtn = h('button', { class: 'btn primary block', type: 'button', disabled: true }, submitLabel);
 
+  const needHint = h('p', { class: 'need small center', 'aria-live': 'polite' });
+  const step = (n, title, desc) => h('h3', { class: 'step' }, h('span', {}, n), title, h('small', {}, desc));
+
   container.append(
-    h('div', { class: 'card' }, h('h3', {}, 'Lokasi'), locText, locBtn),
-    h('div', { class: 'card' }, h('h3', {}, 'Selfie'), video, preview, camMsg, h('div', { class: 'row' }, shotBtn, retakeBtn)),
-    submitBtn);
+    h('div', { class: 'card' }, step(1, 'Lokasi', 'Dipakai untuk memastikan Anda berada di area kantor. Izinkan akses lokasi bila browser meminta.'), locText, locBtn),
+    h('div', { class: 'card' }, step(2, 'Selfie', 'Foto wajah langsung dari kamera (tidak bisa dari galeri). Pastikan wajah terlihat jelas dan cukup terang.'), video, preview, camMsg, h('div', { class: 'row' }, shotBtn, retakeBtn)),
+    needHint, submitBtn);
 
   const refresh = () => {
     submitBtn.disabled = submitting || !(pos && photo);
+    const need = [!pos && 'lokasi terbaca', !photo && 'foto selfie'].filter(Boolean);
+    needHint.textContent = need.length ? `Untuk mengirim, lengkapi dulu: ${need.join(' dan ')}.` : 'Semua siap. Tekan tombol kirim di bawah.';
+    needHint.className = `need small center ${need.length ? 'muted' : 'success'}`;
     locBtn.disabled = submitting;
     shotBtn.disabled = submitting || camFailed;
     retakeBtn.disabled = submitting;
@@ -65,7 +71,7 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
     locText.textContent = 'Mengambil lokasi...';
     try {
       pos = await getPosition();
-      locText.textContent = `Lokasi terbaca (akurasi ±${pos.accuracy} m)`;
+      locText.textContent = `Lokasi terbaca (akurasi ±${pos.accuracy} m). Semakin kecil angkanya, semakin akurat.`;
     } catch (e) {
       locText.className = 'error';
       locText.textContent = e.message;

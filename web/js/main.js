@@ -33,7 +33,8 @@ function showLogin(message) {
   teardown();
   clear(root);
   const btn = h('div', { id: 'gsi-btn', class: 'row', style: 'justify-content:center' });
-  root.append(h('section', { class: 'card center', style: 'margin-top:15vh' },
+  root.append(h('section', { class: 'card center login' },
+    h('div', { class: 'logo', 'aria-hidden': 'true' }, 'B'),
     h('h1', {}, 'Presensi Magang'),
     h('p', { class: 'muted' }, 'Bawaslu Malang'),
     message ? h('p', { class: 'error' }, message) : null,
@@ -61,7 +62,9 @@ async function loadApp() {
     if (gen !== loadGen) return; // ada loadApp()/showLogin() yang lebih baru
     clear(root);
     root.append(h('header', { class: 'topbar' },
-      h('div', {}, h('strong', {}, me.nama), h('span', { class: 'muted' }, me.role === 'admin' ? ' · Admin' : ' · Peserta')),
+      h('div', { class: 'who' },
+        h('div', { class: 'avatar', 'aria-hidden': 'true' }, (me.nama || '?').trim().charAt(0).toUpperCase()),
+        h('div', {}, h('strong', {}, me.nama), h('div', { class: 'muted small' }, `${me.role === 'admin' ? 'Admin' : 'Peserta'} · Bawaslu Malang`))),
       h('button', { class: 'btn ghost', type: 'button', onclick: () => { logout(); showLogin(); } }, 'Keluar')));
     const main = h('main');
     root.append(main);

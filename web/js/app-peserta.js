@@ -1,7 +1,8 @@
 import { api } from './api.js';
-import { h, clear, toast, setBusy, monthOf, addDays, formatTanggal, segmented, table, badge, tabs, loadInto } from './ui.js';
+import { h, clear, toast, setBusy, monthOf, addDays, formatTanggal, segmented, table, badge, tabs, loadInto, stats } from './ui.js';
 import { prepareUpload } from './file.js';
 import { captureFlow, handleSubmitError } from './capture.js';
+import { renderDasborPeserta } from './dashboard.js';
 import { withBusy, setDirty } from './busy.js';
 
 // Upload foto/surat lewat jaringan HP bisa lambat: beri waktu 2 menit.
@@ -9,6 +10,7 @@ const UPLOAD_OPTS = { timeoutMs: 120_000 };
 
 export function mountPeserta(main, me, initialTab) {
   return tabs(main, [
+    { id: 'dasbor', label: 'Dasbor', render: (el) => renderDasborPeserta(el, me) },
     { id: 'presensi', label: 'Presensi', render: (el) => renderPresensi(el, me) },
     { id: 'riwayat', label: 'Riwayat', render: (el) => renderRiwayat(el, me) },
     { id: 'logbook', label: 'Logbook', render: (el) => renderLogbook(el, me) },
@@ -27,12 +29,20 @@ function renderPresensi(el, me) {
     cleanup = draw();
   };
   const draw = () => {
-    el.append(h('p', { class: 'muted' }, `${formatTanggal(me.today)} · Jam masuk ${me.config.jamMasuk}, batas telat ${me.config.batasTelat}`));
     const row = me.absensiHariIni;
+    const state = !row ? ['Belum absen hari ini', 'Pilih keterangan lalu kirim presensi masuk.', 'pending']
+      : row.status !== 'Masuk' ? [`${row.status} hari ini`, 'Keterangan sudah tercatat.', 'info']
+        : !row.jam_pulang ? [`Sudah masuk pukul ${row.jam_masuk || '-'}`, 'Jangan lupa absen pulang.', 'ok']
+          : ['Presensi lengkap', `Masuk ${row.jam_masuk || '-'} · Pulang ${row.jam_pulang}`, 'ok'];
+    el.append(h('div', { class: `hero ${state[2]}` },
+      h('div', { class: 'small' }, formatTanggal(me.today)),
+      h('div', { class: 'clock', 'aria-hidden': 'true' }, jamWib()),
+      h('h2', {}, state[0]), h('p', {}, state[1]),
+      h('div', { class: 'small hint' }, `Jam masuk ${me.config.jamMasuk} · batas telat ${me.config.batasTelat}`)));
     if (!row) return checkInForm(el, me, rerender);
     el.append(statusCard(row));
     if (row.status === 'Masuk' && !row.jam_pulang) {
-      el.append(h('h3', {}, 'Absen Pulang'));
+      el.append(h('h3', {}, 'Absen Pulang'), h('p', { class: 'muted small' }, 'Lakukan saat selesai bekerja: ambil lokasi dan selfie lagi seperti saat masuk.'));
       return captureFlow(el, {
         me,
         onStale: rerender,
@@ -48,10 +58,16 @@ function renderPresensi(el, me) {
     return null;
   };
   cleanup = draw();
+  const tick = setInterval(() => el.querySelectorAll('.clock').forEach((c) => { c.textContent = jamWib(); }), 1000);
   return () => {
     disposed = true;
+    clearInterval(tick);
     cleanup?.();
   };
+}
+
+function jamWib() {
+  return new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date()).replace(/\./g, ':');
 }
 
 function statusCard(row) {
@@ -78,7 +94,7 @@ function checkInForm(el, me, done) {
   catatan.addEventListener('input', updateDirty);
   const statusSeg = segmented(['Masuk', 'Izin', 'Sakit'], status, (v) => { status = v; drawArea(); updateDirty(); }, 'Keterangan presensi');
 
-  el.append(h('div', { class: 'card' }, h('h3', {}, 'Keterangan'), statusSeg), area);
+  el.append(h('div', { class: 'card' }, h('h3', {}, 'Keterangan'), h('p', { class: 'muted small' }, 'Masuk = hadir bekerja. Izin atau Sakit = tidak hadir, wajib unggah surat atau bukti.'), statusSeg), area);
 
   const catatanCard = () => h('div', { class: 'card' }, h('label', {}, 'Catatan (opsional)', catatan));
   // Kunci pilihan status/mode selama submit supaya tidak berubah di tengah pengiriman.
@@ -93,7 +109,7 @@ function checkInForm(el, me, done) {
     if (status === 'Masuk') {
       modeSeg = segmented(['WFO', 'WFH'], mode, (v) => { mode = v; updateDirty(); }, 'Mode kerja');
       area.append(
-        h('div', { class: 'card' }, h('h3', {}, 'Mode kerja'), modeSeg,
+        h('div', { class: 'card' }, h('h3', {}, 'Mode kerja'), modeSeg, h('p', { class: 'muted small' }, 'WFO = bekerja di kantor. WFH = bekerja dari rumah.'),
           h('p', { class: 'muted small' }, `WFO wajib dalam radius ${me.config.radiusMeter} m dari kantor.`)),
         catatanCard());
       flowCleanup = captureFlow(area, {
@@ -154,13 +170,17 @@ function renderRiwayat(el, me) {
   const month = h('input', { type: 'month', value: monthOf(me.today), max: monthOf(me.today) });
   const out = h('div');
   const load = () => loadInto(out, () => api('absen.riwayat', { bulan: month.value }), (rows) => (rows.length
-    ? table([
+    ? h('div', {}, stats([
+      ['Hadir', rows.filter((r) => r.status === 'Masuk').length, 'ok'],
+      ['Izin', rows.filter((r) => r.status === 'Izin').length, 'warn'],
+      ['Sakit', rows.filter((r) => r.status === 'Sakit').length, 'bad'],
+    ]), table([
       { label: 'Tanggal', render: (r) => formatTanggal(r.tanggal) },
       { label: 'Status', render: (r) => badge(r.status) },
       { label: 'Mode', key: 'mode' },
       { label: 'Masuk', key: 'jam_masuk' },
       { label: 'Pulang', key: 'jam_pulang' },
-    ], rows)
+    ], rows))
     : h('p', { class: 'muted' }, 'Belum ada data bulan ini.')));
   month.addEventListener('change', load);
   el.append(h('div', { class: 'card' }, h('label', {}, 'Bulan', month)), out);

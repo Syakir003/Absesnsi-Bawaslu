@@ -1,10 +1,12 @@
 import { api } from './api.js';
-import { h, toast, setBusy, link, monthOf, formatTanggal, table, badge, tabs, loadInto } from './ui.js';
+import { h, toast, setBusy, link, monthOf, formatTanggal, table, badge, tabs, loadInto, stats } from './ui.js';
 import { toCsv, downloadCsv } from './csv.js';
+import { renderDasborAdmin } from './dashboard.js';
 import { withBusy, setDirty } from './busy.js';
 
 export function mountAdmin(main, me, initialTab) {
   return tabs(main, [
+    { id: 'dasbor', label: 'Dasbor', render: (el) => renderDasborAdmin(el, me) },
     { id: 'harian', label: 'Harian', render: (el) => renderHarian(el, me) },
     { id: 'rekap', label: 'Rekap Bulanan', render: (el) => renderRekap(el, me) },
     { id: 'peserta', label: 'Peserta', render: (el) => renderPeserta(el) },
@@ -68,6 +70,12 @@ function renderHarian(el, me) {
     const hadir = rows.filter((r) => r.absensi?.status === 'Masuk').length;
     return h('div', {},
       h('p', { class: 'muted' }, `${formatTanggal(day)} · ${hadir} hadir dari ${rows.length} peserta`),
+      stats([
+        ['Hadir', hadir, 'ok'],
+        ['Izin', rows.filter((r) => r.absensi?.status === 'Izin').length, 'warn'],
+        ['Sakit', rows.filter((r) => r.absensi?.status === 'Sakit').length, 'bad'],
+        ['Belum absen', rows.filter((r) => !r.absensi).length],
+      ]),
       table([
         { label: 'Nama', render: (r) => h('div', {}, r.nama, h('div', { class: 'muted small' }, r.instansi)) },
         { label: 'Status', render: (r) => h('div', {}, badge(r.absensi?.status), r.absensi?.catatan ? h('div', { class: 'muted small' }, r.absensi.catatan) : null) },

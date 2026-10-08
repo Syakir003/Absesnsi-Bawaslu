@@ -113,6 +113,11 @@ export function table(columns, rows) {
     ));
 }
 
+/** Deretan kartu ringkasan angka. items: [[label, nilai, kelas?]] */
+export function stats(items) {
+  return h('div', { class: 'stats' }, items.map(([label, value, cls]) => h('div', { class: `stat ${cls || ''}` }, h('strong', {}, value), h('span', {}, label))));
+}
+
 export function badge(status) {
   return h('span', { class: `badge ${status || 'Belum'}` }, status || 'Belum absen');
 }
