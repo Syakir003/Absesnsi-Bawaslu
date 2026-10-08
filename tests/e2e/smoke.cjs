@@ -234,7 +234,8 @@ function handle(action, data) {
   await page.getByText('Dasbor Admin').waitFor(); await page.getByText('Belum absen (1)').waitFor(); await page.getByText('Perlu dicek (1)').waitFor(); step('admin dasbor');
   await toTab('Harian'); await page.getByText('1 hadir dari 2 peserta').waitFor(); step('admin harian');
   assert((await scrollWidth()) <= 390, 'scroll horizontal di Admin Harian: ' + await scrollWidth()); step('tanpa scroll horizontal (Admin Harian)');
-  assert(await page.locator('nav.tabs.more').count() === 1, 'tab admin overflow tanpa petunjuk (class "more")'); step('petunjuk overflow tab admin');
+  const overflow = await page.evaluate(() => { const n = document.querySelector('nav.tabs'); return n.scrollWidth > n.clientWidth + 2; });
+  assert(!overflow || (await page.locator('nav.tabs.more').count()) === 1, 'tab admin overflow tanpa petunjuk (class "more")'); step('tab admin muat atau punya petunjuk overflow');
   await page.fill('input[type=date]', '');
   await page.waitForFunction(() => document.querySelector('input[type=date]').value === '2026-10-07'); step('harian: tanggal kosong dipulihkan ke hari ini');
   await page.getByText('Dari lapangan').waitFor(); step('catatan tampil di tabel harian');

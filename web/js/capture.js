@@ -95,7 +95,11 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
   shotBtn.addEventListener('click', () => {
     if (submitting) return;
     if (!video.videoWidth) return toast('Kamera belum siap.', 'error');
-    photo = captureFrame(video);
+    const waktu = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' }).format(new Date()).replace(/\./g, ':');
+    photo = captureFrame(video, 640, 0.7, [
+      `${me.nama} · ${waktu} WIB`,
+      pos ? `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} (±${pos.accuracy} m)` : 'Lokasi belum terbaca',
+    ]);
     setDirty('capture', true); // foto sudah diambil: jangan hilang karena muat ulang
     preview.src = `data:image/jpeg;base64,${photo.base64}`;
     video.classList.add('hidden');
