@@ -35,13 +35,14 @@ Pakai akun Google milik kantor/admin (bukan akun pribadi peserta), karena semua 
    4. Isi **Authorized JavaScript origins** dengan tiga origin ini: `https://<username>.github.io`, `http://localhost`, dan `http://localhost:5500`. Perubahan origin bisa butuh beberapa menit sampai berlaku.
    5. Salin Client ID-nya.
 8. Isi sheet `Config`:
-   - `kantor_lat` dan `kantor_lng`: di Google Maps, klik kanan titik kantor, lalu klik koordinatnya untuk menyalin.
+   - `kantor_lat` dan `kantor_lng`: di Google Maps, klik kanan titik kantor, lalu klik koordinatnya untuk menyalin. Google Maps menyalin keduanya sebagai satu teks `lat, lng` (mis. `-7.9666, 112.6326`), jadi pisahkan: angka pertama (lintang/latitude) ke `kantor_lat`, angka kedua (bujur/longitude) ke `kantor_lng`. Setelah semua Config terisi, jalankan `checkSetup` (langkah 10).
    - `radius_meter`, `jam_masuk`, `batas_telat`, `batas_edit_logbook_hari`, `max_akurasi_meter`.
    - `folder_id`: dari langkah 6.
    - `google_client_id`: dari langkah 7.
 9. Isi sheet `Admin` (email, nama). Peserta bisa ditambahkan nanti dari menu Admin → Peserta.
 10. Jalankan fungsi `checkSetup` dan pastikan log menampilkan `Setup OK`.
 11. **Deploy → New deployment → Web app**. Isi Execute as: **Me**, Who has access: **Anyone**. Salin URL `/exec`-nya.
+    Kalau memakai akun Google Workspace (bukan Gmail biasa), pastikan admin Workspace mengizinkan Web App dengan akses **Anyone**; kalau dibatasi, API akan mengembalikan halaman login Google dan app menampilkan "Respons server tidak valid".
 12. Cek dari terminal:
     ```bash
     curl -sL "<URL_EXEC>"
@@ -56,7 +57,7 @@ Pakai akun Google milik kantor/admin (bukan akun pribadi peserta), karena semua 
 
 1. Isi `web/config.js` dengan `API_URL` (dari langkah 11) dan `GOOGLE_CLIENT_ID` (dari langkah 7).
 2. Push repo ke GitHub (paket gratis GitHub Pages butuh repo **public**), lalu buka **Settings → Pages → Source: GitHub Actions**.
-3. Setiap push ke `main` akan menjalankan `npm test` lalu deploy folder `web/` ke `https://<username>.github.io/<repo>/`.
+3. Setiap push ke `main` akan menjalankan `npm test` dan e2e smoke test; folder `web/` baru di-deploy ke `https://<username>.github.io/<repo>/` kalau keduanya lolos.
 
 Kedua nilai di `web/config.js` bukan rahasia: Client ID memang publik, dan API selalu memverifikasi token.
 
@@ -66,5 +67,5 @@ Kedua nilai di `web/config.js` bukan rahasia: Client ID memang publik, dan API s
 - Kuota Apps Script cukup untuk puluhan peserta. Kalau sudah ratusan, pertimbangkan pindah ke backend sendiri.
 - Export: CSV memakai pemisah titik koma (;) untuk Excel berbahasa Indonesia; kalau kolom menyatu, buka lewat Data → From Text/CSV atau Google Sheets.
 - Hari kerja di rekap = Senin–Jumat. Hari libur nasional belum dikecualikan.
-- Satu email = satu baris di sheet `Peserta`. Untuk mengganti email peserta, nonaktifkan baris lama (aktif = N) lalu tambah peserta baru — jangan ada email dobel.
-- Edit data langsung di Sheet boleh, tapi jaga format teks: tanggal `yyyy-MM-dd`, jam `HH:mm:ss`.
+- Satu email = satu baris di sheet `Peserta`. Untuk mengganti email peserta, set baris lama `aktif = N` DAN isi `tanggal_selesai` dengan hari terakhir email itu dipakai, lalu tambah baris baru — jangan ada email dobel. Peserta nonaktif tidak tampil di Rekap kecuali punya absensi dalam periodenya.
+- Edit data langsung di Sheet boleh, tapi jaga format teks: tanggal `yyyy-MM-dd`, jam `HH:mm:ss`. Jangan ubah urutan kolom atau menyisipkan kolom di tengah sheet; kolom tambahan hanya boleh di paling kanan.

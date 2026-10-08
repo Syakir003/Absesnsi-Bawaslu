@@ -4,12 +4,12 @@ function handleAdminHarian_(ctx) {
   if (!isValidDate(tanggal)) throw userError_('Tanggal tidak valid.');
   var absensi = readAll_(SHEETS.ABSENSI).filter(function (r) { return r.tanggal === tanggal; });
   var byEmail = {};
-  absensi.forEach(function (r) { byEmail[r.email] = stripRow_(r); });
+  absensi.forEach(function (r) { byEmail[normEmail_(r.email)] = stripRow_(r); });
   var peserta = readAll_(SHEETS.PESERTA).filter(function (p) {
-    return isPesertaActive(p, tanggal) || byEmail[String(p.email).toLowerCase()];
+    return isPesertaActive(p, tanggal) || byEmail[normEmail_(p.email)];
   });
   return peserta.map(function (p) {
-    var email = String(p.email).toLowerCase();
+    var email = normEmail_(p.email);
     return { email: email, nama: p.nama, instansi: p.instansi, absensi: byEmail[email] || null };
   }).sort(function (a, z) { return a.nama.localeCompare(z.nama); });
 }
@@ -28,7 +28,7 @@ function handleAdminPesertaSave_(ctx) {
   var v = validatePeserta(ctx.data);
   if (!v.ok) throw userError_(v.error);
   return withLock_(function () {
-    var existing = readAll_(SHEETS.PESERTA).filter(function (p) { return String(p.email).toLowerCase() === v.peserta.email; })[0];
+    var existing = readAll_(SHEETS.PESERTA).filter(function (p) { return normEmail_(p.email) === v.peserta.email; })[0];
     if (existing) update_(SHEETS.PESERTA, existing._row, v.peserta);
     else insert_(SHEETS.PESERTA, v.peserta);
     return v.peserta;
@@ -37,11 +37,11 @@ function handleAdminPesertaSave_(ctx) {
 
 function handleAdminLogbook_(ctx) {
   var b = requireMonth_(ctx.data.bulan);
-  var email = ctx.data.email ? String(ctx.data.email).toLowerCase() : '';
+  var email = normEmail_(ctx.data.email);
   var nama = {};
-  readAll_(SHEETS.PESERTA).forEach(function (p) { nama[String(p.email).toLowerCase()] = p.nama; });
+  readAll_(SHEETS.PESERTA).forEach(function (p) { nama[normEmail_(p.email)] = p.nama; });
   return readAll_(SHEETS.LOGBOOK)
-    .filter(function (r) { return r.tanggal >= b.first && r.tanggal <= b.last && (!email || r.email === email); })
+    .filter(function (r) { return r.tanggal >= b.first && r.tanggal <= b.last && (!email || normEmail_(r.email) === email); })
     .sort(function (a, z) { return a.tanggal === z.tanggal ? a.email.localeCompare(z.email) : (a.tanggal < z.tanggal ? 1 : -1); })
-    .map(function (r) { var o = stripRow_(r); o.nama = nama[r.email] || r.email; return o; });
+    .map(function (r) { var o = stripRow_(r); o.nama = nama[normEmail_(r.email)] || r.email; return o; });
 }

@@ -118,3 +118,32 @@ test('buildRekap: baris peserta lain tidak tercampur', () => {
   const out = core.buildRekap([ani, budi], rows, '2026-10', '2026-10-07', '08:00');
   assert.deepEqual(out.map((x) => x.hadir), [1, 2]);
 });
+
+test('buildRekap: peserta nonaktif tanpa baris absensi dikecualikan', () => {
+  const lama = { ...ani, aktif: 'N' };
+  assert.deepEqual(core.buildRekap([lama], [], '2026-10', '2026-10-07', '08:00'), []);
+  // aktif kosong/selain Y juga dianggap nonaktif
+  assert.deepEqual(core.buildRekap([{ ...ani, aktif: '' }], [], '2026-10', '2026-10-07', '08:00'), []);
+});
+
+test('buildRekap: peserta nonaktif dengan baris dalam rentang efektif tetap masuk', () => {
+  const lama = { ...ani, aktif: 'N', tanggal_selesai: '2026-10-05' };
+  const r = rekapAni([row('2026-10-02')], '2026-10-07', lama);
+  assert.equal(r.hadir, 1);
+  assert.equal(r.hariKerja, 3); // 1, 2, 5
+});
+
+test('buildRekap: peserta nonaktif, baris hanya di luar rentang efektif → dikecualikan', () => {
+  const lama = { ...ani, aktif: 'N', tanggal_selesai: '2026-10-05' };
+  // setelah tanggal_selesai, setelah hari ini, dan bulan lain: semuanya di luar rentang efektif
+  const out = core.buildRekap([lama], [row('2026-10-06'), row('2026-10-20'), row('2026-09-30')], '2026-10', '2026-10-07', '08:00');
+  assert.deepEqual(out, []);
+});
+
+test('buildRekap: aktif dibandingkan tanpa peduli huruf besar & spasi', () => {
+  assert.equal(core.buildRekap([{ ...ani, aktif: ' y ' }], [], '2026-10', '2026-10-07', '08:00').length, 1);
+  assert.equal(core.buildRekap([{ ...ani, aktif: 'Y' }], [], '2026-10', '2026-10-07', '08:00').length, 1);
+  // email baris absensi dengan huruf besar/spasi tetap dihitung sebagai baris peserta nonaktif
+  const lama = { ...ani, aktif: 'n' };
+  assert.equal(core.buildRekap([lama], [row('2026-10-01', { email: ' ANI@gmail.com ' })], '2026-10', '2026-10-07', '08:00').length, 1);
+});

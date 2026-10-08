@@ -198,7 +198,8 @@ function renderPeserta(el) {
     h('h3', {}, 'Tambah / Edit Peserta'), editHint,
     h('label', {}, 'Email Google', f.email), h('label', {}, 'Nama', f.nama), h('label', {}, 'Instansi', f.instansi),
     h('label', {}, 'Status', f.aktif), h('label', {}, 'Tanggal mulai', f.tanggal_mulai), h('label', {}, 'Tanggal selesai', f.tanggal_selesai),
-    h('div', { class: 'row' }, saveBtn, resetBtn)), out);
+    h('div', { class: 'row' }, saveBtn, resetBtn),
+    h('p', { class: 'muted small' }, 'Ganti email peserta: nonaktifkan baris lama (dan isi tanggal selesai), lalu tambah peserta baru.')), out);
   fill({});
   load();
   return () => setDirty('peserta', false);

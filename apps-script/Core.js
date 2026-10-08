@@ -104,6 +104,11 @@ function checkTokenClaims(info, clientId, nowSec) {
   return { ok: true, email: email, name: info.name || '', exp: exp };
 }
 
+/** Email untuk pencocokan: huruf kecil + tanpa spasi di pinggir. */
+function normEmail_(s) {
+  return String(s == null ? '' : s).toLowerCase().trim();
+}
+
 function isValidDate(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s))) return false;
   var p = String(s).split('-').map(Number);
@@ -348,6 +353,9 @@ function buildRekap(pesertaList, absensiRows, bulan, today, batasTelat) {
       });
       // Hari ini belum dianggap alpa (peserta masih bisa absen), jadi tidak dihitung.
       r.tanpaKeterangan = hariKerja.filter(function (d) { return d !== today && !tercatat[d]; }).length;
-      return r;
-    });
+      // Peserta nonaktif (aktif !== 'Y') hanya tampil bila punya minimal satu baris absensi dalam rentang efektif.
+      var aktif = String(p.aktif == null ? '' : p.aktif).toUpperCase().trim() === 'Y';
+      return aktif || Object.keys(tercatat).length > 0 ? r : null;
+    })
+    .filter(function (r) { return r !== null; });
 }

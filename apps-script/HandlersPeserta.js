@@ -84,7 +84,7 @@ function handleCheckOut_(ctx) {
 function handleRiwayat_(ctx) {
   var b = requireMonth_(ctx.data.bulan);
   return readAll_(SHEETS.ABSENSI)
-    .filter(function (r) { return r.email === ctx.user.email && r.tanggal >= b.first && r.tanggal <= b.last; })
+    .filter(function (r) { return normEmail_(r.email) === ctx.user.email && r.tanggal >= b.first && r.tanggal <= b.last; })
     .sort(function (a, z) { return a.tanggal < z.tanggal ? 1 : -1; })
     .map(stripRow_);
 }
@@ -93,7 +93,7 @@ function handleLogbookList_(ctx) {
   var b = requireMonth_(ctx.data.bulan);
   var batas = ctx.config.batasEditLogbookHari;
   return readAll_(SHEETS.LOGBOOK)
-    .filter(function (r) { return r.email === ctx.user.email && r.tanggal >= b.first && r.tanggal <= b.last; })
+    .filter(function (r) { return normEmail_(r.email) === ctx.user.email && r.tanggal >= b.first && r.tanggal <= b.last; })
     .sort(function (a, z) { return a.tanggal < z.tanggal ? 1 : -1; })
     .map(function (r) {
       var out = stripRow_(r);
@@ -115,7 +115,7 @@ function handleLogbookSave_(ctx) {
 
   var oldUrl = '';
   var saved = afterUpload_(file, function () { return withLock_(function () {
-    var existing = readAll_(SHEETS.LOGBOOK).filter(function (r) { return r.email === u.email && r.tanggal === d.tanggal; })[0];
+    var existing = readAll_(SHEETS.LOGBOOK).filter(function (r) { return normEmail_(r.email) === u.email && r.tanggal === d.tanggal; })[0];
     if (existing) {
       existing.kegiatan = v.kegiatan;
       if (file) { oldUrl = existing.link_lampiran; existing.link_lampiran = file.url; }

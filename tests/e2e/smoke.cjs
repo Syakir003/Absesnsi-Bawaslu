@@ -25,6 +25,7 @@ class UserErr extends Error {}
 let role = 'peserta';
 let absensi = null;
 let commitThenReject = true; // sekali: check-in tersimpan tapi responsnya ditolak (meniru retry setelah request yang sebenarnya sukses)
+let htmlForMe = false; // sekali-sekali: 'me' dijawab HTML (mis. halaman login Apps Script) untuk menguji deployment salah setting
 let delayCheckinMs = 0; // tahan respons check-in supaya double submit bisa diuji
 const DELAY_ME_MS = 300; // lebar jendela balapan untuk login ganda
 const logbook = [{ tanggal: '2026-10-06', kegiatan: 'Catatan kemarin', bisaEdit: true, link_lampiran: '' }];
@@ -93,6 +94,7 @@ function handle(action, data) {
     const req = JSON.parse(r.request().postData());
     calls.push(req.action);
     if (req.idToken !== TOKEN) return r.fulfill({ json: { ok: false, error: 'no token', code: 'AUTH' } });
+    if (req.action === 'me' && htmlForMe) return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><body>Sign in - Google Accounts</body></html>' });
     if (req.action === 'me') await sleep(DELAY_ME_MS);
     if (req.action === 'absen.checkin' && delayCheckinMs) await sleep(delayCheckinMs);
     try {
@@ -124,6 +126,16 @@ function handle(action, data) {
 
   await page.goto(BASE);
   await page.waitForSelector('#fake-google');
+  // Deployment salah setting (respons HTML, status 200): layar fatal dengan pesan jelas, tanpa retry
+  htmlForMe = true;
+  await page.click('#fake-google');
+  await page.getByText('Respons server tidak valid. Cek setting deployment Apps Script (Who has access: Anyone).').waitFor();
+  await sleep(1500); // lebih lama dari jeda retry (1 dtk): kalau ada retry, 'me' akan terhitung 2x
+  assert(count('me') === 1, `respons non-JSON di-retry: 'me' terkirim ${count('me')}x, seharusnya 1x`);
+  step('respons non-JSON → layar fatal "Respons server tidak valid", tanpa retry');
+  htmlForMe = false;
+  await page.click('text=Coba lagi'); await page.getByRole('button', { name: 'Keluar' }).waitFor();
+  await page.click('text=Keluar'); await page.waitForSelector('#fake-google'); await waitNoLive(); step('Coba lagi setelah mock dipulihkan → masuk normal, lalu keluar');
   // Login ganda cepat (dua callback sebelum 'me' selesai): hanya satu aplikasi boleh ter-mount
   await page.evaluate(() => { const b = document.querySelector('#fake-google'); b.click(); b.click(); }); step('login (klik ganda)');
   await page.getByText('Lokasi terbaca').waitFor(); step('gps terbaca');
@@ -247,7 +259,7 @@ function handle(action, data) {
   await away(10 * 1000);
   assert((await page.inputValue('input[type=month]')) === '2026-08' && count('me') === me0, 'tab/bulan rekap direset setelah background singkat');
   assert(await page.locator('nav.tabs button.active', { hasText: 'Rekap Bulanan' }).count() === 1, 'tab aktif berpindah'); step('foreground: background singkat tidak mereset tab Rekap + filter bulan');
-  await page.click('nav >> text=Peserta'); await page.getByRole('button', { name: 'Edit' }).click();
+  await page.click('nav >> text=Peserta'); await page.getByText('Ganti email peserta: nonaktifkan baris lama (dan isi tanggal selesai), lalu tambah peserta baru.').waitFor(); step('peserta: petunjuk ganti email'); await page.getByRole('button', { name: 'Edit' }).click();
   if ((await page.inputValue('input[type=email]')) !== 'ani@gmail.com') throw new Error('edit tidak isi form');
   await page.getByText('Mode edit: ani@gmail.com').waitFor();
   await page.click('text=Simpan Peserta'); await page.getByText('Peserta tersimpan.').waitFor(); step('peserta edit+simpan');

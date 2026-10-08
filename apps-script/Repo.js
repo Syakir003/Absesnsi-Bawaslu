@@ -77,7 +77,7 @@ function readConfig_() {
 
 function findAbsensi_(email, tanggal) {
   return readAll_(SHEETS.ABSENSI).filter(function (r) {
-    return r.email === email && r.tanggal === tanggal;
+    return normEmail_(r.email) === normEmail_(email) && r.tanggal === tanggal;
   })[0] || null;
 }
 

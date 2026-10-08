@@ -11,12 +11,14 @@ export class ApiError extends Error {
   }
 }
 
+const INVALID_RESPONSE_MSG = 'Respons server tidak valid. Cek setting deployment Apps Script (Who has access: Anyone).';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Panggil Apps Script. Content-Type text/plain supaya tidak kena CORS preflight.
  * Timeout default 60 dtk (opsi timeoutMs, mis. untuk upload foto). Retry 1x (setelah jeda 1 dtk) hanya untuk error jaringan/timeout
- * (server menolak duplikat, jadi aman).
+ * (server menolak duplikat, jadi aman). Respons non-JSON -> ApiError 'SERVER', tidak di-retry.
  */
 export async function api(action, data = {}, { retries = 1, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const body = JSON.stringify({ action, idToken: getToken(), data });
@@ -34,7 +36,15 @@ export async function api(action, data = {}, { retries = 1, timeoutMs = DEFAULT_
         signal: ctrl.signal,
       });
       if (!res.ok) throw new ApiError(`Server error (${res.status}). Coba lagi.`, 'NETWORK');
-      const json = await res.json();
+      // Bukan JSON (mis. halaman login Google karena akses deployment bukan "Anyone"): salah setting, bukan error jaringan, jadi tidak di-retry.
+      const text = await res.text(); // gagal di sini (koneksi putus/timeout) tetap dianggap error jaringan
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = null;
+      }
+      if (!json || typeof json !== 'object') throw new ApiError(INVALID_RESPONSE_MSG, 'SERVER');
       if (!json.ok) {
         if (json.code === 'AUTH') {
           clearSession();

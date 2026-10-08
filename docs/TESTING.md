@@ -3,6 +3,7 @@
 Jalankan setelah deploy backend dan frontend. Pakai minimal 1 HP Android (Chrome) dan 1 iPhone (Safari) kalau ada.
 
 ## Persiapan
+- [ ] Setelah mengisi sheet `Config`, jalankan `checkSetup` di editor Apps Script: log menampilkan "Setup OK".
 - [ ] Sheet `Admin` berisi email kamu, dan sheet `Peserta` berisi 1 akun test (aktif, periode mencakup hari ini).
 - [ ] `radius_meter` sementara diisi 100.
 
@@ -15,6 +16,8 @@ Jalankan setelah deploy backend dan frontend. Pakai minimal 1 HP Android (Chrome
 ## Login
 - [ ] Email yang tidak terdaftar ditolak dengan pesan "belum terdaftar".
 - [ ] Peserta nonaktif (`aktif` = N) ditolak dengan pesan "tidak aktif".
+- [ ] Akun di luar periode magang (sebelum `tanggal_mulai` atau setelah `tanggal_selesai`) ditolak dengan pesan "di luar periode magang".
+- [ ] Setelah sekitar 1 jam token Google kedaluwarsa: app kembali ke halaman login dengan pesan sesi habis, lalu bisa login lagi.
 - [ ] Peserta masuk ke tab Presensi, admin masuk ke tab Harian.
 - [ ] Tombol Keluar lalu login lagi berjalan normal.
 
@@ -23,6 +26,7 @@ Jalankan setelah deploy backend dan frontend. Pakai minimal 1 HP Android (Chrome
 - [ ] Izin kamera ditolak: muncul pesan cara mengaktifkan.
 - [ ] WFO di kantor (dalam radius): absen masuk berhasil, baris muncul di sheet `Absensi`, selfie ada di folder Drive.
 - [ ] WFO dari luar kantor: ditolak dengan info jarak (m).
+- [ ] Absen pulang WFO dari luar radius: ditolak dan peserta diberi tahu (pesan jarak dari kantor).
 - [ ] WFH dari rumah: berhasil, `jarak_masuk` tercatat.
 - [ ] Absen pulang berhasil dan `jam_pulang` terisi.
 - [ ] Mencoba absen lagi di hari yang sama ditolak.
