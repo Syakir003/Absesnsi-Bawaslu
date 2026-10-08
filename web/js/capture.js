@@ -55,7 +55,7 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
 
   const refresh = () => {
     submitBtn.disabled = submitting || !(pos && photo);
-    const need = [!pos && 'lokasi terbaca', !photo && 'foto selfie'].filter(Boolean);
+    const need = [!pos && 'lokasi', !photo && 'foto selfie'].filter(Boolean);
     needHint.textContent = need.length ? `Untuk mengirim, lengkapi dulu: ${need.join(' dan ')}.` : 'Semua siap. Tekan tombol kirim di bawah.';
     needHint.className = `need small center ${need.length ? 'muted' : 'success'}`;
     locBtn.disabled = submitting;

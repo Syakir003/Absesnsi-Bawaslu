@@ -121,6 +121,7 @@ function handle(action, data) {
   const away = async (ms) => { await setVis('hidden'); await page.evaluate((m) => { window.__offset += m; }, ms); await setVis('visible'); await sleep(700); };
   const MIN = 60 * 1000;
   const waitMe = async (before, msg) => { for (let i = 0; i < 40 && count('me') === before; i++) await sleep(150); assert(count('me') > before, msg); };
+  const toTab = (name) => page.click(`nav >> text=${name}`); // login mendarat di Dasbor
   const activeTab = () => page.locator('nav.tabs button.active').first().innerText();
   const noDriveLinks = async (where) => assert((await page.locator('a[href*="drive.google.com"]').count()) === 0, `peserta melihat link Drive di ${where}`);
 
@@ -138,6 +139,8 @@ function handle(action, data) {
   await page.click('text=Keluar'); await page.waitForSelector('#fake-google'); await waitNoLive(); step('Coba lagi setelah mock dipulihkan → masuk normal, lalu keluar');
   // Login ganda cepat (dua callback sebelum 'me' selesai): hanya satu aplikasi boleh ter-mount
   await page.evaluate(() => { const b = document.querySelector('#fake-google'); b.click(); b.click(); }); step('login (klik ganda)');
+  await page.getByText('Halo, Ani').waitFor(); step('dasbor peserta tampil');
+  await toTab('Presensi');
   await page.getByText('Lokasi terbaca').waitFor(); step('gps terbaca');
   await waitVideo(); step('kamera aktif');
   assert((await scrollWidth()) <= 390, 'scroll horizontal di Presensi: ' + await scrollWidth()); step('tanpa scroll horizontal (Presensi)');
@@ -201,7 +204,7 @@ function handle(action, data) {
   step('refresh tertunda jalan otomatis setelah simpan + tab Logbook dipertahankan');
 
   // Kamera harus mati saat ganti mode/tab/logout (semua stream yang pernah dibuka)
-  absensi = null; await page.reload(); await waitVideo();
+  absensi = null; await page.reload(); await page.getByText('Halo, Ani').waitFor(); await toTab('Presensi'); await waitVideo();
   assert((await liveTracks()) > 0, 'kamera seharusnya aktif');
   // Selfie yang sudah diambil tidak boleh hilang karena kembali ke aplikasi setelah >5 menit
   await page.getByText('Lokasi terbaca').waitFor(); await page.click('text=Ambil Foto');
@@ -216,11 +219,11 @@ function handle(action, data) {
   await page.click('text=Keluar'); await page.waitForSelector('#fake-google'); await waitNoLive(); step('logout mematikan kamera');
   // Login ganda lagi, lalu logout: tidak boleh ada kamera bocor dari mount ganda
   await page.evaluate(() => { const b = document.querySelector('#fake-google'); b.click(); b.click(); });
-  await waitVideo(); await sleep(500);
+  await page.getByText('Halo, Ani').waitFor(); await toTab('Presensi'); await waitVideo(); await sleep(500);
   await page.click('text=Keluar'); await page.waitForSelector('#fake-google'); await waitNoLive(); step('login ganda tidak membocorkan kamera');
 
   // Izin flow on fresh state
-  await page.click('#fake-google'); await page.click('.seg >> text=Izin');
+  await page.click('#fake-google'); await page.getByText('Halo, Ani').waitFor(); await toTab('Presensi'); await page.click('.seg >> text=Izin');
   await page.getByLabel('Surat / bukti').waitFor(); step('form izin tampil (label file)');
   await page.screenshot({ path: path.join(OUT, 'shot-izin.png'), fullPage: true });
   await page.setInputFiles('input[type=file]', { name: 'surat.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') });
@@ -228,7 +231,8 @@ function handle(action, data) {
   await page.getByText('Surat terkirim').waitFor(); await noDriveLinks('status izin'); step('peserta: surat tanpa link Drive');
 
   role = 'admin'; await page.click('text=Keluar'); await page.click('#fake-google');
-  await page.getByText('1 hadir dari 2 peserta').waitFor(); step('admin harian');
+  await page.getByText('Dasbor Admin').waitFor(); await page.getByText('Belum absen (1)').waitFor(); await page.getByText('Perlu dicek (1)').waitFor(); step('admin dasbor');
+  await toTab('Harian'); await page.getByText('1 hadir dari 2 peserta').waitFor(); step('admin harian');
   assert((await scrollWidth()) <= 390, 'scroll horizontal di Admin Harian: ' + await scrollWidth()); step('tanpa scroll horizontal (Admin Harian)');
   assert(await page.locator('nav.tabs.more').count() === 1, 'tab admin overflow tanpa petunjuk (class "more")'); step('petunjuk overflow tab admin');
   await page.fill('input[type=date]', '');
