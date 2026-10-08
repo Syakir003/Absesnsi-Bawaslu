@@ -141,3 +141,19 @@ tbody tr:hover { background: #fafbfc; }
 .thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); background: #eef1f6; }
 .lightbox { border: 0; border-radius: 16px; padding: 12px; max-width: min(92vw, 640px); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
 .lightbox::backdrop { background: rgba(0,0,0,.6); } .lightbox img { width: 100%; border-radius: 10px; display: block; margin-bottom: 10px; }
+
+/* HP: baris tabel menjadi kartu; label kolom diambil dari data-label. Sel kosong disembunyikan. */
+@media (max-width: 640px) {
+  .table-wrap table, .table-wrap tbody { display: block; background: transparent; }
+  .table-wrap thead { display: none; }
+  .table-wrap tr { display: block; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 6px 14px; margin-bottom: 10px; }
+  .table-wrap td { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border); text-align: right; word-break: break-word; }
+  .table-wrap td:last-child { border-bottom: 0; }
+  .table-wrap td:empty { display: none; }
+  .table-wrap td::before { content: attr(data-label); flex: none; color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; text-align: left; padding-top: 2px; }
+  .table-wrap td[data-label=""]::before { content: none; }
+  .table-wrap td[data-label=""] { justify-content: flex-end; }
+  .table-wrap td .row { justify-content: flex-end; }
+}
+@media print { .table-wrap table { display: table !important; } .table-wrap thead { display: table-header-group !important; } .table-wrap tbody { display: table-row-group !important; } .table-wrap tr { display: table-row !important; box-shadow: none; border: 0; padding: 0; } .table-wrap td { display: table-cell !important; text-align: left; } .table-wrap td::before { content: none !important; } }
+@media (max-width: 640px) { .table-wrap td:has(> .row:empty) { display: none; } }

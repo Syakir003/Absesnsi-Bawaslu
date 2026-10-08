@@ -136,7 +136,7 @@ export function table(columns, rows) {
   return h('div', { class: 'table-wrap' },
     h('table', {},
       h('thead', {}, h('tr', {}, columns.map((c) => h('th', {}, c.label)))),
-      h('tbody', {}, rows.map((r) => h('tr', {}, columns.map((c) => h('td', {}, c.render ? c.render(r) : (r[c.key] ?? '')))))),
+      h('tbody', {}, rows.map((r) => h('tr', {}, columns.map((c) => h('td', { 'data-label': c.label }, c.render ? c.render(r) : (r[c.key] ?? '')))))),
     ));
 }
 
