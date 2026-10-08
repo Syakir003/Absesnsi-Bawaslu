@@ -102,3 +102,11 @@ test('addDays: aritmetika tanggal UTC lintas bulan/tahun/kabisat', async () => {
   assert.equal(addDays('2028-03-01', -1), '2028-02-29');
   assert.equal(addDays('2026-10-07', 0), '2026-10-07');
 });
+
+import { driveId } from '../web/js/ui.js';
+
+test('driveId: ambil ID dari tautan Drive, tolak host lain', () => {
+  assert.equal(driveId('https://drive.google.com/file/d/1AbC_-x/view?usp=drivesdk'), '1AbC_-x');
+  assert.equal(driveId('https://evil.com/file/d/123/view'), null);
+  assert.equal(driveId(''), null);
+});

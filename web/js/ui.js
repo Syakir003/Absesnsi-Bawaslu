@@ -66,6 +66,33 @@ export function link(url, label) {
   return href ? h('a', { href, target: '_blank', rel: 'noopener noreferrer' }, label) : '';
 }
 
+/** ID file dari tautan Drive (…/file/d/ID/…), atau null. */
+export function driveId(url) {
+  const href = safeUrl(url);
+  return href ? (/\/file\/d\/([\w-]+)/.exec(new URL(href).pathname)?.[1] ?? null) : null;
+}
+
+const thumbSrc = (id, w) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}`;
+
+/** Thumbnail foto Drive; klik → <dialog> ukuran besar. Gagal dimuat → tautan teks biasa. */
+export function thumb(url, label) {
+  const id = driveId(url);
+  if (!id) return link(url, label);
+  const img = h('img', { class: 'thumb', src: thumbSrc(id, 160), alt: label, loading: 'lazy', referrerpolicy: 'no-referrer' });
+  const btn = h('button', { class: 'thumb-btn', type: 'button', title: label, 'aria-label': `Perbesar ${label}` }, img, h('span', { class: 'small muted' }, label));
+  img.addEventListener('error', () => btn.replaceWith(link(url, label)));
+  btn.addEventListener('click', () => {
+    const dlg = h('dialog', { class: 'lightbox' },
+      h('img', { src: thumbSrc(id, 1000), alt: label, referrerpolicy: 'no-referrer' }),
+      h('div', { class: 'row' }, link(url, 'Buka di Drive'), h('button', { class: 'btn small', type: 'button', onclick: () => dlg.close() }, 'Tutup')));
+    dlg.addEventListener('close', () => dlg.remove());
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    document.body.append(dlg);
+    dlg.showModal();
+  });
+  return btn;
+}
+
 export function monthOf(dateStr) {
   return String(dateStr).slice(0, 7);
 }

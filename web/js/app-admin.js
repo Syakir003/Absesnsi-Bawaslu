@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { h, toast, setBusy, link, monthOf, formatTanggal, table, badge, tabs, loadInto, stats } from './ui.js';
+import { h, toast, setBusy, link, thumb, monthOf, formatTanggal, table, badge, tabs, loadInto, stats } from './ui.js';
 import { toCsv, downloadCsv } from './csv.js';
 import { renderDasborAdmin } from './dashboard.js';
 import { withBusy, setDirty } from './busy.js';
@@ -85,7 +85,7 @@ function renderHarian(el, me) {
         { label: 'Jarak', render: (r) => (r.absensi?.jarak_masuk ? `${r.absensi.jarak_masuk} m` : '') },
         { label: 'Flag', render: (r) => (r.absensi?.flags ? h('span', { class: 'warn small' }, r.absensi.flags) : '') },
         { label: 'Bukti', render: (r) => h('div', { class: 'row' },
-          link(r.absensi?.link_selfie_masuk, 'Selfie masuk'), link(r.absensi?.link_selfie_pulang, 'Selfie pulang'),
+          thumb(r.absensi?.link_selfie_masuk, 'Masuk'), thumb(r.absensi?.link_selfie_pulang, 'Pulang'),
           link(r.absensi?.link_surat, 'Surat'), link(mapsUrl(r.absensi?.lat_masuk, r.absensi?.lng_masuk), 'Lokasi')) },
       ], rows));
   };
