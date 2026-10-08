@@ -90,6 +90,7 @@ function handle(action, data) {
     navigator.mediaDevices.getUserMedia = async (c) => { const s = await orig(c); window.__streams.push(s); return s; };
   });
   await page.route('https://accounts.google.com/gsi/client', (r) => r.fulfill({ contentType: 'text/javascript', body: FAKE_GSI }));
+  await page.route('https://nominatim.openstreetmap.org/**', (r) => r.fulfill({ json: { address: { road: 'Jl. Tugu', suburb: 'Klojen', city: 'Kota Malang' } } }));
   await page.route('https://script.google.com/**', async (r) => {
     const req = JSON.parse(r.request().postData());
     calls.push(req.action);

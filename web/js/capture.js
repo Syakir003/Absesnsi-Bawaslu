@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { h, toast, setBusy } from './ui.js';
-import { getPosition } from './geo.js';
+import { getPosition, reverseGeocode } from './geo.js';
 import { openCamera, stopCamera, captureFrame } from './camera.js';
 import { withBusy, setDirty } from './busy.js';
 
@@ -30,6 +30,7 @@ export async function handleSubmitError(e, me) {
  */
 export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, onStale, onLock }) {
   let pos = null;
+  let place = null; // Promise<{kota, alamat}|null> untuk pos saat ini
   let photo = null;
   let stream = null;
   let disposed = false;
@@ -66,11 +67,13 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
   async function readLocation() {
     if (submitting) return;
     pos = null;
+    place = null;
     refresh();
     locText.className = 'muted';
     locText.textContent = 'Mengambil lokasi...';
     try {
       pos = await getPosition();
+      place = reverseGeocode(pos.lat, pos.lng);
       locText.textContent = `Lokasi terbaca (akurasi ±${pos.accuracy} m). Semakin kecil angkanya, semakin akurat.`;
     } catch (e) {
       locText.className = 'error';
@@ -92,14 +95,20 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
     }
   }
 
-  shotBtn.addEventListener('click', () => {
+  shotBtn.addEventListener('click', async () => {
     if (submitting) return;
     if (!video.videoWidth) return toast('Kamera belum siap.', 'error');
+    shotBtn.disabled = true; // tunggu nama tempat (maks ±6 dtk) supaya masuk watermark
+    const tempat = pos && place ? await place : null;
+    if (disposed) return;
+    shotBtn.disabled = false;
     const waktu = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' }).format(new Date()).replace(/\./g, ':');
     photo = captureFrame(video, 640, 0.7, [
       `${me.nama} · ${waktu} WIB`,
+      tempat?.kota ? `${tempat.kota}` : null,
+      tempat?.alamat || null,
       pos ? `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} (±${pos.accuracy} m)` : 'Lokasi belum terbaca',
-    ]);
+    ].filter(Boolean));
     setDirty('capture', true); // foto sudah diambil: jangan hilang karena muat ulang
     preview.src = `data:image/jpeg;base64,${photo.base64}`;
     video.classList.add('hidden');
