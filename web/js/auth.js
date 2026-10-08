@@ -63,6 +63,19 @@ export function getToken() {
   return token;
 }
 
+/** Foto profil Google dari klaim `picture` di ID token; hanya https googleusercontent, selain itu null. */
+export function pictureFromPayload(payload) {
+  try {
+    const u = new URL(payload?.picture);
+    return u.protocol === 'https:' && /(^|\.)googleusercontent\.com$/.test(u.hostname) ? u.href : null;
+  } catch { return null; }
+}
+
+export function getPicture() {
+  const token = getToken();
+  try { return token ? pictureFromPayload(decodeJwt(token)) : null; } catch { return null; }
+}
+
 export function clearSession() {
   store(null);
 }

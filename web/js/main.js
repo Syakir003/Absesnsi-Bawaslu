@@ -1,4 +1,4 @@
-import { renderLogin, getToken, logout, waitForGsi } from './auth.js';
+import { renderLogin, getToken, getPicture, logout, waitForGsi } from './auth.js';
 import { api } from './api.js';
 import { h, clear, toast } from './ui.js';
 import { isBusy, isDirty, clearDirty, onIdle } from './busy.js';
@@ -42,6 +42,17 @@ function showLogin(message) {
   renderLogin(btn, loadApp);
 }
 
+// Foto profil Google bila ada; gagal dimuat / tidak ada → inisial nama.
+function avatar(nama) {
+  const box = h('div', { class: 'avatar', 'aria-hidden': 'true' }, (nama || '?').trim().charAt(0).toUpperCase());
+  const src = getPicture();
+  if (src) {
+    const img = h('img', { src, alt: '', referrerpolicy: 'no-referrer' });
+    img.addEventListener('load', () => box.replaceChildren(img));
+  }
+  return box;
+}
+
 function showFatal(message, onRetry = loadApp) {
   mounted = false;
   clear(root);
@@ -63,7 +74,7 @@ async function loadApp() {
     clear(root);
     root.append(h('header', { class: 'topbar' },
       h('div', { class: 'who' },
-        h('div', { class: 'avatar', 'aria-hidden': 'true' }, (me.nama || '?').trim().charAt(0).toUpperCase()),
+        avatar(me.nama),
         h('div', {}, h('strong', {}, me.nama), h('div', { class: 'muted small' }, `${me.role === 'admin' ? 'Admin' : 'Peserta'} · Bawaslu Malang`))),
       h('button', { class: 'btn ghost', type: 'button', onclick: () => { logout(); showLogin(); } }, 'Keluar')));
     const main = h('main');

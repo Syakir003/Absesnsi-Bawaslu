@@ -35,3 +35,12 @@ test('isTokenFresh: payload tanpa exp dianggap tidak fresh', () => {
   assert.equal(isTokenFresh({}, 0, Date.now()), false);
   assert.equal(isTokenFresh(null, 0, Date.now()), false);
 });
+
+import { pictureFromPayload } from '../web/js/auth.js';
+
+test('pictureFromPayload: hanya https googleusercontent', () => {
+  assert.equal(pictureFromPayload({ picture: 'https://lh3.googleusercontent.com/a/x=s96-c' }), 'https://lh3.googleusercontent.com/a/x=s96-c');
+  assert.equal(pictureFromPayload({ picture: 'https://evil.com/googleusercontent.com' }), null);
+  assert.equal(pictureFromPayload({ picture: 'http://lh3.googleusercontent.com/x' }), null);
+  assert.equal(pictureFromPayload({}), null);
+});
