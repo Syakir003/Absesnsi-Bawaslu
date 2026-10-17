@@ -1,11 +1,11 @@
 :root {
   --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 14px rgba(16,24,40,.06); --ring: 0 0 0 3px rgba(179,38,30,.18);
-  --bg: #f4f6f9; --card: #ffffff; --text: #1d2433; --muted: #667085; --border: #e3e7ee;
-  --primary: #b3261e; --primary-text: #ffffff; --success: #12652b; --error: #b3261e; --warn: #8a5300;
+  --bg: #fbf3e8; --card: #ffffff; --text: #1d2433; --muted: #6b6559; --border: #eadfce; --serif: "Lora", Georgia, serif; --gold: #c9a24a;
+  --primary: #a3201a; --primary-text: #ffffff; --success: #12652b; --error: #b3261e; --warn: #8a5300;
   --radius: 16px;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: linear-gradient(180deg, #fbeceb 0, var(--bg) 220px) no-repeat, var(--bg); min-height: 100vh; -webkit-font-smoothing: antialiased; color: var(--text); font: 15px/1.5 "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { margin: 0; background: radial-gradient(900px 260px at 85% -60px, rgba(163,32,26,.12), transparent) no-repeat, var(--bg); min-height: 100vh; -webkit-font-smoothing: antialiased; color: var(--text); font: 15px/1.5 "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 .container { max-width: 960px; margin: 0 auto; padding: 0 16px 48px; }
 h1 { font-size: 1.6rem; letter-spacing: -.02em; margin: .5rem 0; } h3 { font-size: 1rem; margin: 0 0 .5rem; }
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 16px; margin: 12px 0 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
@@ -36,8 +36,8 @@ input:focus, textarea:focus, select:focus { outline: 0; border-color: var(--prim
 label { display: block; margin-bottom: 8px; }
 label.strong { font-weight: 600; }
 label.strong input { font-weight: 400; }
-.cam { width: 100%; max-width: 360px; border-radius: 16px; box-shadow: var(--shadow); background: #000; display: block; margin: 0 auto 8px; transform: scaleX(-1); }
-img.cam { transform: none; }
+.cam { width: 100%; max-width: 360px; border-radius: 16px; box-shadow: var(--shadow); background: #000; display: block; margin: 0 auto 8px; }
+.cam.flip { transform: scaleX(-1); }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-radius: 12px; overflow: hidden; border-collapse: collapse; background: var(--card); font-size: .9rem; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -57,12 +57,44 @@ tbody tr:hover { background: #fafbfc; }
   body { background: #fff; } .card, .topbar { box-shadow: none; } .card { border: 0; padding: 0; }
 }
 
-.login { max-width: 400px; margin: 14vh auto 0; padding: 40px 28px 32px; position: relative; overflow: hidden; }
-.login::before { content: ""; position: absolute; inset: -40% -20% auto; height: 70%; background: radial-gradient(closest-side, rgba(179,38,30,.16), transparent); pointer-events: none; }
-.login > * { position: relative; }
-.login h1 { font-size: 1.9rem; margin: .75rem 0 .25rem; }
-.login .muted { margin: 0 0 24px; letter-spacing: .08em; text-transform: uppercase; font-size: .78rem; }
-.logo { width: 56px; height: 56px; margin: 0 auto; display: grid; place-items: center; border-radius: 18px; color: #fff; font-size: 1.6rem; font-weight: 700; background: linear-gradient(135deg, #d6382f, #8f1b15); box-shadow: 0 8px 20px rgba(179,38,30,.35); }
+.brand { height: 34px; width: auto; flex: none; }
+.container:has(.landing) { max-width: none; padding: 0; }
+.landing { --maroon: #8f1b15; --gold: #c9a24a; --serif: "Lora", Georgia, serif; position: relative; display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; padding: 20px; overflow: hidden; background: #fbf3e8; animation: rise .5s both; }
+.landing > * { position: relative; z-index: 2; }
+.landing-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px; }
+.landing-brand { display: flex; align-items: center; gap: 10px; }
+.landing-brand img { height: 42px; width: auto; }
+.landing-brand strong { display: block; font-size: 1.15rem; letter-spacing: .02em; line-height: 1.1; }
+.landing-brand span { font-size: .7rem; font-weight: 600; letter-spacing: .12em; }
+.landing h1 { font: 700 2.2rem/1.1 var(--serif); letter-spacing: -.01em; margin: 0; }
+.landing h1 em { font-style: normal; color: var(--maroon); }
+.landing-rule { width: 64px; height: 3px; border: 0; margin: 10px 0 16px; background: linear-gradient(90deg, var(--gold) 70%, rgba(201,162,74,.25)); }
+.landing h2 { font: 600 1.35rem/1.25 var(--serif); margin: 0 0 12px; }
+.landing-tag { color: var(--muted); margin: 0 0 18px; }
+.landing-photo { flex: 1; min-height: 210px; margin: 0 -20px 22px; background: url(../img/gedung.jpg) center / cover, linear-gradient(135deg, #d6382f, #8f1b15); border-radius: 22px 22px 60% 22px / 22px 22px 40px 22px; }
+.landing-cta { position: relative; width: 300px; max-width: 100%; height: 56px; margin: 0 auto 22px; cursor: pointer; }
+.landing-cta-face { display: flex; align-items: center; justify-content: space-between; height: 100%; padding: 0 8px 0 28px; border-radius: 999px; color: #fff; font-weight: 600; font-size: 1.05rem; background: linear-gradient(135deg, #a3201a, #6e1410); box-shadow: 0 8px 20px rgba(143,27,21,.35); }
+.landing-cta-face i { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff; }
+.landing-cta-face svg { width: 20px; height: 20px; fill: none; stroke: var(--maroon); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* Tombol Google (iframe) ditaruh transparan di atas tombol visual: klik tetap diterima Google. */
+.landing-cta #gsi-btn { position: absolute; top: 0; left: 0; width: 300px; height: 40px; opacity: .01; transform-origin: 0 0; transform: scaleY(1.4); }
+.landing-values { display: flex; margin: auto 0 0; padding: 0; list-style: none; }
+.landing-values li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: .85rem; border-left: 1px solid rgba(143,27,21,.18); }
+.landing-values li:first-child { border: 0; }
+.landing-values svg { width: 30px; height: 30px; fill: none; stroke: var(--maroon); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.landing-wave { display: none; }
+@media (min-width: 1000px) {
+  .landing { padding: 0 0 0 7vw; justify-content: center; }
+  .landing-top { position: absolute; top: 0; left: 0; right: 0; margin: 0; padding: 26px 5vw 0 7vw; }
+  .landing-photo { position: absolute; z-index: 0; top: 0; right: 0; bottom: 0; width: 70vw; margin: 0; border-radius: 0; background: url(../img/gedung.jpg) 60% center / cover; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 42%); mask-image: linear-gradient(to right, transparent 0, #000 42%); }
+  .landing > :not(.landing-photo):not(.landing-wave):not(.landing-top) { max-width: min(460px, 38vw); }
+  .landing h1 { font-size: 3.2rem; } .landing h2 { font-size: 1.9rem; }
+  .landing-cta { margin: 0 0 40px; }
+  .landing-values { margin-top: 0; }
+  .landing-wave { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 36vh; max-width: none !important; padding: 0 5vw 28px 0; color: #fff; font-size: .8rem; letter-spacing: .22em; line-height: 2; text-transform: uppercase; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23b3261e'/%3E%3Cstop offset='1' stop-color='%23650e0a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 100V86C22 74 40 96 62 66S92 30 100 28V100Z' fill='url(%23g)'/%3E%3Cpath d='M0 90C22 78 40 100 62 70S92 34 100 32' fill='none' stroke='%23c9a24a' stroke-width='.5' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
+  .landing-wave::after { content: ""; width: 56px; height: 2px; margin-top: 10px; background: var(--gold); }
+}
 @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .card, .topbar, .tabs { animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }
 .card:nth-of-type(2) { animation-delay: .06s; } .card:nth-of-type(3) { animation-delay: .12s; }
@@ -157,3 +189,20 @@ tbody tr:hover { background: #fafbfc; }
 }
 @media print { .table-wrap table { display: table !important; } .table-wrap thead { display: table-header-group !important; } .table-wrap tbody { display: table-row-group !important; } .table-wrap tr { display: table-row !important; box-shadow: none; border: 0; padding: 0; } .table-wrap td { display: table-cell !important; text-align: left; } .table-wrap td::before { content: none !important; } }
 @media (max-width: 640px) { .table-wrap td:has(> .row:empty) { display: none; } }
+
+/* Tema aplikasi (peserta & admin): krem + marun + emas, selaras dengan halaman landing. */
+h3, .hero h2, .welcome h2 { font-family: var(--serif); letter-spacing: -.01em; }
+.card, .topbar { border-radius: 18px; }
+.topbar { border-bottom: 2px solid var(--gold); }
+.tabs { background: #fff; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.tabs button.active, .seg button.active, .btn.primary { background: linear-gradient(135deg, #a3201a, #7a1612); }
+.tabs button.active { box-shadow: 0 2px 8px rgba(122,22,18,.35); }
+.btn.primary { border-color: transparent; box-shadow: 0 6px 16px rgba(143,27,21,.28); }
+.btn.primary:hover:not(:disabled) { background: linear-gradient(135deg, #8f1b15, #651210); }
+.hero { border-radius: 20px; }
+.hero.pending { background: linear-gradient(135deg, #a3201a, #5e0f0b); }
+.hero::before { content: ""; position: absolute; left: 20px; top: 0; width: 56px; height: 3px; background: var(--gold); }
+th { background: #f6ede0; }
+tbody tr:hover { background: #fdf8f0; }
+.avatar { box-shadow: 0 0 0 2px var(--gold); }
+h3 small { font-family: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: 0; }

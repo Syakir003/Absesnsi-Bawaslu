@@ -41,14 +41,16 @@ function drawWatermark(ctx, w, h, lines) {
   lines.forEach((t, i) => ctx.fillText(t, pad, h - barH + pad + i * Math.round(fs * 1.35), w - pad * 2));
 }
 
-/** Ambil frame video → JPEG base64 (tanpa prefix data URL), lebar maks 640px. watermark = array baris teks (opsional). */
-export function captureFrame(videoEl, maxWidth = 640, quality = 0.7, watermark = []) {
+/** Ambil frame video → JPEG base64 (tanpa prefix data URL), lebar maks 640px. watermark = array baris teks (opsional). flip = cerminkan gambar (watermark tetap terbaca). */
+export function captureFrame(videoEl, maxWidth = 640, quality = 0.7, watermark = [], flip = false) {
   const scale = Math.min(1, maxWidth / videoEl.videoWidth);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(videoEl.videoWidth * scale);
   canvas.height = Math.round(videoEl.videoHeight * scale);
   const ctx = canvas.getContext('2d');
+  if (flip) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
   ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (watermark.length) drawWatermark(ctx, canvas.width, canvas.height, watermark);
   return { mime: 'image/jpeg', base64: canvas.toDataURL('image/jpeg', quality).split(',')[1] };
 }

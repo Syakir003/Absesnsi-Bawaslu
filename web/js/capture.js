@@ -43,6 +43,11 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
   const preview = h('img', { class: 'cam hidden', alt: 'Preview selfie' });
   const camMsg = h('p', { class: 'error hidden', 'aria-live': 'polite' });
   const shotBtn = h('button', { class: 'btn', type: 'button' }, 'Ambil Foto');
+  // Kamera depan ada yang sudah mengirim gambar terbalik dari perangkatnya dan tidak bisa dideteksi: biarkan pengguna memilih.
+  let flip = false;
+  try { flip = localStorage.getItem('cam-flip') === '1'; } catch { /* storage diblokir: pakai default */ }
+  const flipBtn = h('button', { class: 'btn ghost', type: 'button' }, 'Balik kamera');
+  video.classList.toggle('flip', flip);
   const retakeBtn = h('button', { class: 'btn ghost hidden', type: 'button' }, 'Ulangi Foto');
   const submitBtn = h('button', { class: 'btn primary block', type: 'button', disabled: true }, submitLabel);
 
@@ -51,7 +56,7 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
 
   container.append(
     h('div', { class: 'card' }, step(1, 'Lokasi', 'Dipakai untuk memastikan Anda berada di area kantor. Izinkan akses lokasi bila browser meminta.'), locText, locBtn),
-    h('div', { class: 'card' }, step(2, 'Selfie', 'Foto wajah langsung dari kamera (tidak bisa dari galeri). Pastikan wajah terlihat jelas dan cukup terang.'), video, preview, camMsg, h('div', { class: 'row' }, shotBtn, retakeBtn)),
+    h('div', { class: 'card' }, step(2, 'Selfie', 'Foto wajah langsung dari kamera (tidak bisa dari galeri). Pastikan wajah terlihat jelas dan cukup terang.'), video, preview, camMsg, h('div', { class: 'row' }, shotBtn, flipBtn, retakeBtn)),
     needHint, submitBtn);
 
   const refresh = () => {
@@ -108,12 +113,13 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
       tempat?.kota ? `${tempat.kota}` : null,
       tempat?.alamat || null,
       pos ? `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} (±${pos.accuracy} m)` : 'Lokasi belum terbaca',
-    ].filter(Boolean));
+    ].filter(Boolean), flip);
     setDirty('capture', true); // foto sudah diambil: jangan hilang karena muat ulang
     preview.src = `data:image/jpeg;base64,${photo.base64}`;
     video.classList.add('hidden');
     preview.classList.remove('hidden');
     shotBtn.classList.add('hidden');
+    flipBtn.classList.add('hidden');
     retakeBtn.classList.remove('hidden');
     refresh();
   });
@@ -125,8 +131,15 @@ export function captureFlow(container, { me, submitLabel, getExtra, onSubmit, on
     preview.classList.add('hidden');
     video.classList.remove('hidden');
     shotBtn.classList.remove('hidden');
+    flipBtn.classList.remove('hidden');
     retakeBtn.classList.add('hidden');
     refresh();
+  });
+
+  flipBtn.addEventListener('click', () => {
+    flip = !flip;
+    video.classList.toggle('flip', flip);
+    try { localStorage.setItem('cam-flip', flip ? '1' : '0'); } catch { /* abaikan */ }
   });
 
   locBtn.addEventListener('click', readLocation);

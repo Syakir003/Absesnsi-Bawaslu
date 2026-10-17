@@ -95,7 +95,7 @@ let gsiInitialized = false;
 let loginHandler = null;
 
 /** initialize() hanya sekali; pemanggilan berikutnya hanya mengganti callback dan menggambar ulang tombol. */
-export function renderLogin(container, onLogin) {
+export function renderLogin(container, onLogin, opts = {}) {
   loginHandler = onLogin;
   if (!gsiInitialized) {
     google.accounts.id.initialize({
@@ -106,7 +106,7 @@ export function renderLogin(container, onLogin) {
     });
     gsiInitialized = true;
   }
-  google.accounts.id.renderButton(container, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with' });
+  google.accounts.id.renderButton(container, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', ...opts });
   google.accounts.id.prompt();
 }
 
