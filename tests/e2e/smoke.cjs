@@ -273,6 +273,9 @@ function handle(action, data) {
   await page.fill('input[type=email]', 'ANI@gmail.com'); await page.fill('input[maxlength="100"]', 'Ani Dobel');
   await page.click('text=Simpan Peserta'); await page.getByText('Email sudah terdaftar. Klik Edit di tabel untuk mengubah.').waitFor();
   assert(count('admin.peserta.save') === 1, 'email duplikat tetap dikirim ke server'); step('peserta: email duplikat diblokir');
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Nonaktifkan' }).click(); await page.getByText('Ani dinonaktifkan.').waitFor();
+  assert(count('admin.peserta.save') === 2, 'tombol nonaktifkan tidak memanggil save'); step('peserta: tombol nonaktifkan');
   await away(6 * MIN);
   assert((await page.inputValue('input[type=email]')) === 'ANI@gmail.com' && count('me') === me0, 'form peserta yang kotor hilang/dimuat ulang'); step('foreground: form peserta kotor tidak dimuat ulang');
   // Hanya ganti hari (hilang 6 detik melewati tengah malam): kotor → toast tanpa muat ulang

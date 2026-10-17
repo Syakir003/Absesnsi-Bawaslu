@@ -174,10 +174,29 @@ function renderPeserta(el) {
       { label: 'Nama', key: 'nama' }, { label: 'Email', key: 'email' }, { label: 'Instansi', key: 'instansi' },
       { label: 'Periode', render: (p) => `${p.tanggal_mulai} s/d ${p.tanggal_selesai}` },
       { label: 'Status', render: (p) => (p.aktif === 'Y' ? 'Aktif' : 'Nonaktif') },
-      { label: '', render: (p) => h('button', { class: 'btn small', type: 'button', onclick: () => { fill(p); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, 'Edit') },
+      { label: '', render: (p) => h('div', { class: 'row' },
+        h('button', { class: 'btn small', type: 'button', onclick: () => { fill(p); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, 'Edit'),
+        h('button', { class: 'btn small', type: 'button', onclick: (ev) => toggleAktif(p, ev.currentTarget) }, p.aktif === 'Y' ? 'Nonaktifkan' : 'Aktifkan')) },
     ], rows)
     : h('p', { class: 'muted' }, 'Belum ada peserta.');
   };
+
+  // Nonaktif/aktif cepat dari tabel; semua kolom lain dikirim apa adanya (admin.peserta.save mengganti seluruh baris).
+  async function toggleAktif(p, btn) {
+    const aktif = p.aktif === 'Y' ? 'N' : 'Y';
+    if (aktif === 'N' && !window.confirm(`Nonaktifkan ${p.nama}? Peserta tidak bisa absen sampai diaktifkan lagi.`)) return;
+    setBusy(btn, true, 'Menyimpan...');
+    await withBusy(async () => {
+      try {
+        await api('admin.peserta.save', { ...p, aktif });
+        toast(`${p.nama} ${aktif === 'Y' ? 'diaktifkan' : 'dinonaktifkan'}.`, 'success');
+        load();
+      } catch (e) {
+        toast(e.message, 'error');
+        setBusy(btn, false);
+      }
+    });
+  }
 
   saveBtn.addEventListener('click', async () => {
     const email = f.email.value.trim().toLowerCase();
